@@ -1,0 +1,25 @@
+From 2e28187cbb718044cd963d7290f2a4611c305a9a Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 29 Nov 2010 22:34:51 +0100
+Subject: [PATCH 01/20] Fix xm* exiting with a BadFont error
+
+---
+ defcom.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/defcom.c b/defcom.c
+index 8f354dd..f8a59b5 100644
+--- a/defcom.c
++++ b/defcom.c
+@@ -265,7 +265,7 @@ XtResource resources[] =
+ #endif /* TRANSPUTER */
+ #endif /* XMRED */
+   {XtNfont, XtCFont, XtRFont, sizeof(Font),
+-      XtOffsetOf(DATA, font), XtRImmediate, (XtPointer)FONT_NAME},
++      XtOffsetOf(DATA, font), XtRString, (XtPointer)FONT_NAME},
+   {XtNreverseVideo, XtCReverseVideo, XtRBoolean, sizeof(Boolean),
+       XtOffsetOf(DATA, swap), XtRImmediate, (XtPointer)False},
+   {"monochrome", "Monochrome", XtRBoolean, sizeof(Boolean),
+-- 
+1.7.5
+

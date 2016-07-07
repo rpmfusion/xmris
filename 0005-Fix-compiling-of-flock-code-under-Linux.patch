@@ -1,0 +1,26 @@
+From 51f13c5ef15a4a63e5184579ac1ddc8fab03382b Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 29 Nov 2010 23:30:59 +0100
+Subject: [PATCH 05/20] Fix compiling of flock code under Linux
+
+---
+ scoring.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/scoring.c b/scoring.c
+index 0c61b9b..6f1030f 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -38,6 +38,9 @@
+ /*}}}*/
+ /*{{{  file locking*/
+ #ifndef SYSV
++#ifdef linux
++#include <sys/file.h>
++#endif
+ #define lock_file(stream) flock(fileno(stream), LOCK_EX)
+ #define unlock_file(stream) flock(fileno(stream), LOCK_UN)
+ #else
+-- 
+1.7.5
+

@@ -1,0 +1,388 @@
+From 383d6b1c86c0697f422e169499ba84c1231f7df5 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Fri, 29 Apr 2011 16:14:33 +0200
+Subject: [PATCH 08/20] Fix compiler warnings
+
+---
+ Drag.c       |    3 +--
+ Icon.c       |    3 +--
+ PixmapList.c |   23 ++++++++++-------------
+ control.c    |   35 +++++++++++++++++------------------
+ dialogs.c    |    8 ++++----
+ makemred.c   |    2 +-
+ makemris.c   |    4 ++--
+ menubar.c    |   12 ++++++------
+ player.c     |    4 ++--
+ scram.c      |    2 +-
+ 10 files changed, 45 insertions(+), 51 deletions(-)
+
+diff --git a/Drag.c b/Drag.c
+index 32e863b..6376614 100644
+--- a/Drag.c
++++ b/Drag.c
+@@ -510,9 +510,8 @@ FUNCARG((widget),
+       int x, y;
+       unsigned border;
+       unsigned depth;
+-      Status status;
+       
+-      status = XGetGeometry(XtDisplay(widget), widget->drag.pixmap, &root,
++      XGetGeometry(XtDisplay(widget), widget->drag.pixmap, &root,
+ 	  &x, &y, &widget->drag.width, &widget->drag.height, &border, &depth);
+     }
+   else
+diff --git a/Icon.c b/Icon.c
+index 215c979..d54a239 100644
+--- a/Icon.c
++++ b/Icon.c
+@@ -620,9 +620,8 @@ FUNCARG((widget),
+       int x, y;
+       unsigned border;
+       unsigned depth;
+-      Status status;
+       
+-      status = XGetGeometry(XtDisplay(widget), widget->icon.pixmap, &root,
++      XGetGeometry(XtDisplay(widget), widget->icon.pixmap, &root,
+ 	  &x, &y, &widget->icon.width, &widget->icon.height, &border, &depth);
+     }
+   else
+diff --git a/PixmapList.c b/PixmapList.c
+index ab128fa..aeb7155 100644
+--- a/PixmapList.c
++++ b/PixmapList.c
+@@ -1199,9 +1199,8 @@ ARGSEP  PixmapInfo *pi
+       int x, y;
+       unsigned border;
+       unsigned depth;
+-      Status status;
+       
+-      status = XGetGeometry(XtDisplay(plw), pi->pixmap,
++      XGetGeometry(XtDisplay(plw), pi->pixmap,
+ 	  &root, &x, &y, (unsigned int *)&pi->width,
+ 	  (unsigned int *)&pi->height, &border, &depth);
+     }
+@@ -1359,12 +1358,12 @@ ARGSEP  XtPointer call
+   int       length;
+   
+   plw = (PixmapListWidget)client;
+-  if(!(int)call)
++  if(!(long)call)
+     return;
+   length = plw->pixmap_list.orient == XtorientVertical ?
+       plw->core.height : plw->core.width;
+   start = length / 2;
+-  if((int)call > 0)
++  if((long)call > 0)
+     start = -start;
+   start -= plw->pixmap_list.orient == XtorientVertical ?
+       plw->pixmap_list.y : plw->pixmap_list.x;
+@@ -1410,23 +1409,21 @@ FUNCARG((plw),
+  *  our geometry changes
+  */
+ {
+-  float     shown, top;
++  union { float f; XtArgVal xav; } shown, top;
+   Arg       args[2];
+   
+   if(!plw->pixmap_list.scroll)
+     return;
+-  shown = (float)(plw->pixmap_list.orient == XtorientVertical ?
++  shown.f = (float)(plw->pixmap_list.orient == XtorientVertical ?
+       plw->core.height + 1 : plw->core.width + 1) /
+       (float)plw->pixmap_list.length;
+-  if(shown > (float)1.0)
+-    shown = (float)1.0;
+-  top = (float)(plw->pixmap_list.orient == XtorientVertical ?
++  if(shown.f > (float)1.0)
++    shown.f = (float)1.0;
++  top.f = (float)(plw->pixmap_list.orient == XtorientVertical ?
+       -plw->pixmap_list.y : -plw->pixmap_list.x) /
+       (float)plw->pixmap_list.length;
+-  XtSetArg(args[0], XtNtopOfThumb, sizeof(float) > sizeof(XtArgVal) ?
+-      (XtArgVal)&top : *(XtArgVal *)&top);
+-  XtSetArg(args[1], XtNshown, sizeof(float) > sizeof(XtArgVal) ?
+-      (XtArgVal)&shown : *(XtArgVal *)&shown);
++  XtSetArg(args[0], XtNtopOfThumb, top.xav);
++  XtSetArg(args[1], XtNshown, shown.xav);
+   XtSetValues(plw->pixmap_list.scroll, args, 2);
+   return;
+ }
+diff --git a/control.c b/control.c
+index 8261ad4..d5059b4 100644
+--- a/control.c
++++ b/control.c
+@@ -373,7 +373,7 @@ ARGSEP  XtPointer call
+ {
+   int     delta;
+   
+-  delta = (int)call ? (int)call < 0 ? -1 : 1 : 0;
++  delta = (long)call ? (long)call < 0 ? -1 : 1 : 0;
+   if((delta >= 0 || state.counts[5]) && (delta <= 0 ||
+       state.counts[5] != APPLE_LIMIT))
+     adjust_count(5, delta);
+@@ -431,7 +431,7 @@ ARGSEP  XtPointer call
+   IconCallback *call_data;
+   int       option;
+   
+-  option = state.button[(unsigned)client];
++  option = state.button[(unsigned long)client];
+   call_data = (IconCallback *)call;
+   if(option == OPTION_APPLES)
+     select_apple(call_data->selection);
+@@ -454,13 +454,13 @@ ARGSEP  XtPointer call
+ {
+   if(state.edit)
+     {
+-      state.edit->board->colors = (unsigned)client;
++      state.edit->board->colors = (unsigned long)client;
+       paint_garden_icon(state.edit);
+       paint_garden_image();
+       repaint_garden_icon();
+       changed_flag |= state.change;
+     }
+-  set_icon_color((unsigned)client);
++  set_icon_color((unsigned long)client);
+   return;
+ }
+ /*}}}*/
+@@ -477,13 +477,13 @@ ARGSEP  XtPointer call
+ {
+   if(state.edit)
+     {
+-      state.edit->board->fill = (unsigned)client;
++      state.edit->board->fill = (unsigned long)client;
+       paint_garden_icon(state.edit);
+       paint_garden_image();
+       repaint_garden_icon();
+       changed_flag |= state.change;
+     }
+-  set_icon_fill((unsigned)client);
++  set_icon_fill((unsigned long)client);
+   return;
+ }
+ /*}}}*/
+@@ -498,9 +498,9 @@ ARGSEP  XtPointer call
+  * change the display mode and update the garden
+  */
+ {
+-  if(state.mode != (unsigned)client)
++  if(state.mode != (unsigned long)client)
+     {
+-      state.mode = (unsigned)client;
++      state.mode = (unsigned long)client;
+       paint_garden_icon(state.edit);
+       paint_garden_image();
+       repaint_garden_icon();
+@@ -525,7 +525,7 @@ ARGSEP  XtPointer call
+   IconCallback *call_data;
+   unsigned  option;
+   
+-  option = (unsigned)client;
++  option = (unsigned long)client;
+   call_data = (IconCallback *)call;
+   if(option == OPTION_APPLES)
+     if(select_apple(call_data->selection))
+@@ -802,36 +802,35 @@ FUNCARG((root),
+   /*{{{  set option callback*/
+   for(gptr = &gizmos[GIZMO_OPTIONS + OPTIONS - 1], ix = OPTIONS;
+       ix--; gptr--)
+-    XtAddCallback(gptr->widget, XtNcallback, command_option, (XtPointer)ix);
++    XtAddCallback(gptr->widget, XtNcallback, command_option, (XtPointer)(unsigned long)ix);
+   /*}}}*/
+   /*{{{  set fill callback*/
+   for(gptr = &gizmos[GIZMO_FILLS + FILLS - 1], ix = FILLS; ix--; gptr--)
+-    XtAddCallback(gptr->widget, XtNcallback, command_fill, (XtPointer)ix);
++    XtAddCallback(gptr->widget, XtNcallback, command_fill, (XtPointer)(unsigned long)ix);
+   /*}}}*/
+   /*{{{  set color callback*/
+   for(gptr = &gizmos[GIZMO_COLORS + BACKGROUNDS - 1], ix = BACKGROUNDS;
+       ix--; gptr--)
+-    XtAddCallback(gptr->widget, XtNcallback, command_color, (XtPointer)ix);
++    XtAddCallback(gptr->widget, XtNcallback, command_color, (XtPointer)(unsigned long)ix);
+   /*}}}*/
+   /*{{{  set mode callback*/
+   for(gptr = &gizmos[GIZMO_DISPLAY_BASE + MODES - 1], ix = MODES;
+       ix--; gptr--)
+-    XtAddCallback(gptr->widget, XtNcallback, command_mode, (XtPointer)ix);
++    XtAddCallback(gptr->widget, XtNcallback, command_mode, (XtPointer)(unsigned long)ix);
+   /*}}}*/
+   /*{{{  set button callback*/
+   for(gptr = &gizmos[GIZMO_BUTTONS + BUTTONS - 1], ix = BUTTONS;
+       ix--; gptr--)
+-    XtAddCallback(gptr->widget, XtNcallback, command_button, (XtPointer)ix);
++    XtAddCallback(gptr->widget, XtNcallback, command_button, (XtPointer)(unsigned long)ix);
+   /*}}}*/
+   /*{{{  setup apple scrollbar*/
+   {
+-    float     shown;
++    union { float f; XtArgVal xav; } shown;
+     Arg       arg[1];
+     
+     gptr = &gizmos[GIZMO_TOTAL_WARNINGS + 5];
+-    shown = (float)1.0;
+-    XtSetArg(arg[0], XtNshown, sizeof(float) > sizeof(XtArgVal) ?
+-  	(XtArgVal)&shown : *(XtArgVal *)&shown);
++    shown.f = (float)1.0;
++    XtSetArg(arg[0], XtNshown, shown.xav);
+     XtSetValues(gptr->widget, arg, 1);
+     XtAddCallback(gptr->widget, XtNjumpProc, apple_jump, (XtPointer)NULL);
+     XtAddCallback(gptr->widget, XtNscrollProc, apple_scroll, (XtPointer)NULL);
+diff --git a/dialogs.c b/dialogs.c
+index 43410b5..9d864e4 100644
+--- a/dialogs.c
++++ b/dialogs.c
+@@ -87,7 +87,7 @@ ARGSEP  Cardinal  *argc
+     for(optr = dialog_options; optr->text; optr ++)
+       if(!strcmp(optr->text, *argv))
+ 	{
+-	  dialog_option(widget, (XtPointer)optr->option, (XtPointer)NULL);
++	  dialog_option(widget, (XtPointer)(unsigned long)optr->option, (XtPointer)NULL);
+ 	  break;
+ 	}
+   return;
+@@ -135,7 +135,7 @@ ARGSEP  XtPointer call
+     widget = XtParent(widget);
+   if(!widget)
+     /* EMPTY */;
+-  else if((unsigned)client == DIALOG_CLEAR)
++  else if((unsigned long)client == DIALOG_CLEAR)
+     {
+       Widget    text;
+       
+@@ -160,7 +160,7 @@ ARGSEP  XtPointer call
+ 	if(dptr->dialog == widget)
+ 	  {
+ 	    dptr->selection |=
+-		(unsigned)client & dptr->options;
++		(unsigned long)client & dptr->options;
+ 	    if(dptr->selection && dptr->up)
+ 	      {
+ 		dptr->up = 0;
+@@ -320,7 +320,7 @@ FUNCARG((root),
+ 	      if(optr->option & (1 << count))
+ 		{
+ 		  XawDialogAddButton(dptr->dialog, optr->text,
+-		      dialog_option, (XtPointer)(1 << count));
++		      dialog_option, (XtPointer)(unsigned long)(1 << count));
+ 		  break;
+ 		}
+ 	  }
+diff --git a/makemred.c b/makemred.c
+index 18aa078..ee1f7a1 100644
+--- a/makemred.c
++++ b/makemred.c
+@@ -492,7 +492,7 @@ ARGSEP  String  *argv
+ 	/* EMPTY */;
+       display.toplevel = XtAppInitialize(&display.context, "Xmris",
+ 	  options, (Cardinal)(ptr - options),
+-	  (Cardinal *)&argc, (String *)argv,
++	  &argc, (String *)argv,
+ 	  (String *)fallback_resources,
+ 	  toplevel_args, XtNumber(toplevel_args));
+       if(argc > 1)
+diff --git a/makemris.c b/makemris.c
+index 9ea2bb5..4bf8d20 100644
+--- a/makemris.c
++++ b/makemris.c
+@@ -282,7 +282,7 @@ ARGSEP  String  *argv
+ 	    /* EMPTY */;
+ 	  display.toplevel = XtAppInitialize(&display.context, "Xmris",
+ 	      options, (Cardinal)(ptr - options),
+-	      (Cardinal *)&argc, (String *)argv,
++	      &argc, (String *)argv,
+ 	      (String *)NULL, toplevel_args, XtNumber(toplevel_args));
+ 	}
+       if(argc > 1)
+@@ -309,7 +309,7 @@ ARGSEP  String  *argv
+ 	/*{{{  some more setup*/
+ 	{
+ 	  XtResource CONST *ptr;
+-	  char CONST *dir;
++	  char *dir;
+ 	  
+ 	  XtAppSetTypeConverter(display.context, XtRString, XtRKeySym,
+ 	      convert_string2keysym, (XtConvertArgRec *)NULL, 0, XtCacheNone,
+diff --git a/menubar.c b/menubar.c
+index 616a70c..57db711 100644
+--- a/menubar.c
++++ b/menubar.c
+@@ -147,7 +147,7 @@ ARGSEP  XtPointer call
+   char  CONST *error;
+   int       insert;
+   
+-  if((unsigned)client == GIZMO_FILE_LOAD - GIZMO_FILE_BASE)
++  if((unsigned long)client == GIZMO_FILE_LOAD - GIZMO_FILE_BASE)
+     {
+       if(!check_saved(CHANGED_ANY))
+ 	return;
+@@ -166,7 +166,7 @@ ARGSEP  XtPointer call
+ 	  dialog = DIALOG_FILE_ERROR;
+ 	  title = "Cannot load";
+ 	  menu_filename(result);
+-	  if((unsigned)client == GIZMO_FILE_LOAD - GIZMO_FILE_BASE)
++	  if((unsigned long)client == GIZMO_FILE_LOAD - GIZMO_FILE_BASE)
+ 	    free_descriptors();
+ 	  error = load_boards(filename, insert);
+ 	}
+@@ -174,7 +174,7 @@ ARGSEP  XtPointer call
+ 	break;
+     }
+   while(error);
+-  if((unsigned)client == GIZMO_FILE_LOAD - GIZMO_FILE_BASE)
++  if((unsigned long)client == GIZMO_FILE_LOAD - GIZMO_FILE_BASE)
+     changed_flag = 0;
+   return;
+ }
+@@ -234,7 +234,7 @@ ARGSEP  XtPointer call
+   char CONST *error;
+   
+   XtVaGetValues(widget, XtNlabel, &title, NULL);
+-  dialog = filename && *filename && (unsigned)client ==
++  dialog = filename && *filename && (unsigned long)client ==
+       GIZMO_FILE_SAVE - GIZMO_FILE_BASE ? -1 : DIALOG_FILENAME;
+   error = NULL;
+   option = DIALOG_NONE;
+@@ -475,10 +475,10 @@ FUNCARG((root),
+   create_gizmos(root, gizmos, XtNumber(gizmos));
+   for(ix = XtNumber(file_callbacks); ix--;)
+     XtAddCallback(gizmos[GIZMO_FILE_BASE + ix].widget,
+-	XtNcallback, file_callbacks[ix], (XtPointer)ix);
++	XtNcallback, file_callbacks[ix], (XtPointer)(unsigned long)ix);
+   for(ix = XtNumber(garden_callbacks); ix--;)
+     XtAddCallback(gizmos[GIZMO_GARDEN_BASE + ix].widget,
+-	XtNcallback, garden_callbacks[ix], (XtPointer)ix);
++	XtNcallback, garden_callbacks[ix], (XtPointer)(unsigned long)ix);
+   menu_filename(NULL);
+   menu_total(0);
+   return;
+diff --git a/player.c b/player.c
+index 560fb1d..944393f 100644
+--- a/player.c
++++ b/player.c
+@@ -8,8 +8,8 @@ extern VOIDFUNC bounce_ball FUNCARGVOID
+  * bouncing the ball is rather involved
+  */
+ {
+-  COORD     tl;
+-  COORD     br;
++  COORD     tl = { 0, 0 };
++  COORD     br = { 0, 0 };
+   CELL      *cptr;
+   CELL      *optr;
+   
+diff --git a/scram.c b/scram.c
+index 62546e7..7d34d33 100644
+--- a/scram.c
++++ b/scram.c
+@@ -113,7 +113,7 @@ ARGSEP  BITMAP    *bitmap     /* bitmap ptr */
+   FILE      *stream;
+   unsigned  state;
+   char      line[128];
+-  SIZE      place;
++  SIZE      place = { 0, 0 };
+   unsigned  extra;
+   
+   stream = fopen(name, "r");
+-- 
+1.7.5
+

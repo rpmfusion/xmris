@@ -1,0 +1,72 @@
+From 07e599150a81a85f327ad8b84102c359da442ed8 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 2 May 2011 11:58:04 +0200
+Subject: [PATCH 17/20] Set class to Xmsit / Xmris depending on how we're
+ launched
+
+And also create a separate Xmsit.ad with gender: she so that launching as
+xmsit actually gives us msit.
+---
+ Imakefile  |    7 ++++++-
+ makemris.c |    3 ++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/Imakefile b/Imakefile
+index 09931d8..31c8550 100644
+--- a/Imakefile
++++ b/Imakefile
+@@ -209,7 +209,7 @@ all :: initialize
+ all :: xmris xmred
+ 	@#keep gnumake happy
+ 
+-all :: README.xmris README.xmred Xmris.ad
++all :: README.xmris README.xmred Xmris.ad Xmsit.ad
+ 	@#keep gnumake happy
+ 
+ XCOMM rules to make sure the initialize thing is done
+@@ -251,10 +251,14 @@ InstallManPage(xmred,$(THEMANDIR))
+ 
+ XCOMM application resource files
+ InstallAppDefaults(Xmris)
++InstallAppDefaults(Xmsit)
+ 
+ Xmris.ad : Xmris-ad.src
+ 	sed -e s@FONT@$(FONT)@ < Xmris-ad.src > Xmris.ad
+ 
++Xmsit.ad : Xmris.ad
++	sed -e "s@Gender:\t\the@Gender:\t\tshe@" < Xmris.ad > Xmsit.ad
++
+ #ifdef InstallDefaultGardens
+ XCOMM install default gardens
+ install :: $(GARDENS)
+@@ -273,6 +277,7 @@ NormalProgramTarget(scram,$(SCRAMOBJS),,,)
+ clean ::
+ 	$(RM) $(MRISOBJS)
+ 	$(RM) Xmris.ad
++	$(RM) Xmsit.ad
+ 	$(RM) $(MREDOBJS)
+ 	$(RM) $(WIDGETOBJS)
+ 	$(RM) $(SCRAMOBJS)
+diff --git a/makemris.c b/makemris.c
+index 95046d7..6b129c1 100644
+--- a/makemris.c
++++ b/makemris.c
+@@ -274,13 +274,14 @@ ARGSEP  String  *argv
+       if(data.nodisplay == False)
+ 	{
+ 	  XrmOptionDescRec CONST *ptr;
++	  const char *myclass = default_gender ? "Xmsit" : "Xmris";
+     
+ 	  /* as options is an extern of unknown size, I can't use
+ 	   * XtNumber() to get its size, so I've done it this way
+ 	   */
+ 	  for(ptr = options; *(char CONST **)ptr; ptr++)
+ 	    /* EMPTY */;
+-	  display.toplevel = XtAppInitialize(&display.context, "Xmris",
++	  display.toplevel = XtAppInitialize(&display.context, myclass,
+ 	      options, (Cardinal)(ptr - options),
+ 	      &argc, (String *)argv,
+ 	      (String *)NULL, toplevel_args, XtNumber(toplevel_args));
+-- 
+1.7.5
+

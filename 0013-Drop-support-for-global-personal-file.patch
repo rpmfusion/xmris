@@ -1,0 +1,223 @@
+From 256730c26c8369518d131d9b85a871907cf3f7bc Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Sat, 30 Apr 2011 16:09:45 +0200
+Subject: [PATCH 13/20] Drop support for global personal file
+
+Having it in $home works fine and having support for both just
+needlessly complicates the code.
+---
+ scoring.c |   91 +++++-------------------------------------------------------
+ xmris.man |   14 +---------
+ 2 files changed, 9 insertions(+), 96 deletions(-)
+
+diff --git a/scoring.c b/scoring.c
+index 2e93b30..fd2cd77 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -20,9 +20,7 @@
+ static CONST char *score_dir = "/var/games";
+ static CONST char date_formats[4] = "DMY";
+ static char     *score_file = NULL;   /* high score file name */
+-static char     *personal_file = NULL;  /* personal in high score dir */
+ static char     *personal_home = NULL;  /* personal in home dir */
+-static int      personal_make = 2;
+ static char     date_format[4] = "   ";
+ static char     *alternate = NULL;    /* alternative name */
+ static HIGH_SCORE *CONST tables[] =
+@@ -54,8 +52,7 @@ extern VOIDFUNC check_scores FUNCARGVOID
+ {
+   retire_scores();
+   if((score_file && file_changed(score_file)) ||
+-      (!personal_make && personal_file &&
+-      file_changed(personal_file)))
++     (personal_home && file_changed(personal_home)))
+     load_check_expire_insert(0);
+   return;
+ }
+@@ -290,8 +287,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+   /*}}}*/
+   /*{{{  score directory?*/
+     {
+-      size_t    nlen;
+-  
+       dirlen = strlen(score_dir);
+       score_file = malloc(dirlen + 14);
+       if(score_file)
+@@ -299,14 +294,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+ 	  strcpy(score_file, score_dir);
+ 	  strcpy(&score_file[dirlen], "/xmris.score");
+ 	}
+-      nlen = strlen(user);
+-      personal_file = malloc(dirlen + 8 + nlen);
+-      if(personal_file)
+-	{
+-	  strcpy(personal_file, score_dir);
+-	  strcpy(&personal_file[dirlen], "/xmris-");
+-	  strcpy(&personal_file[dirlen + 7], user);
+-	}
+     }
+   /*}}}*/
+   /*{{{  personal file*/
+@@ -421,11 +408,10 @@ FUNCARG((insert),
+  */
+ {
+   FILE      *score_stream;
+-  FILE      *personal_stream;
+   FILE      *home_stream;
+   unsigned  do_score, do_personal;
+   
+-  score_stream = personal_stream = home_stream = NULL;
++  score_stream = home_stream = NULL;
+   do_score = do_personal = 0;
+   /*{{{  score_file?*/
+   if(score_file)
+@@ -437,37 +423,14 @@ FUNCARG((insert),
+ 	do_score = 1;
+     }
+   /*}}}*/
+-  /*{{{  personal_file?*/
+-  if(personal_file)
+-    {
+-      personal_stream = get_lock(personal_file, personal_make);
+-      if(personal_stream)
+-	{
+-	  personal_make = 0;
+-	  if(personal_home && !unlink(personal_home))
+-	      fprintf(stderr, "Two personal score files, '%s' removed\n",
+-		personal_home);
+-	  personal_home = NULL;
+-	  do_personal = merge_personal(personal_stream);
+-	}
+-    }
+-  /*}}}*/
+   /*{{{  personal_home?*/
+   if(personal_home)
+     {
+       home_stream = get_lock(personal_home, 2);
+       if(home_stream)
+-	{
+-	  merge_personal(home_stream);
+-	  if(!personal_file)
+-	    {
+-	      personal_file = personal_home;
+-	      personal_home = NULL;
+-	      personal_make = 0;
+-	    }
+-	  else
+-	    do_personal = 1;
+-	}
++	do_personal = merge_personal(home_stream);
++      else
++	do_personal = 1;
+     }
+   /*}}}*/
+   /*{{{  check alternate*/
+@@ -588,27 +551,6 @@ FUNCARG((insert),
+ 	  do_score |= found;
+ 	  /*{{{  try personal files too*/
+ 	  {
+-	    /*{{{  score directory?*/
+-	      {
+-		size_t    dirlen;
+-		char      *file;
+-		
+-		dirlen = strlen(score_dir);
+-		file = malloc(dirlen + 8 + strlen(data.remove));
+-		if(file)
+-		  {
+-		    strcpy(file, score_dir);
+-		    strcpy(&file[dirlen], "/xmris-");
+-		    strcpy(&file[dirlen + 7], data.remove);
+-		    if(!unlink(file))
+-		      {
+-			personal = 1;
+-			found = 1;
+-		      }
+-		    free(file);
+-		  }
+-	      }
+-	    /*}}}*/
+ 	    /*{{{  home directory?*/
+ 	    {
+ 	      if(home)
+@@ -1003,39 +945,22 @@ FUNCARG((insert),
+   /*{{{  write personal?*/
+   if(do_personal)
+     {
+-      if(!personal_stream && score_stream && personal_file)
+-	personal_stream = get_lock(personal_file, 3);
+-      if(personal_stream)
+-	{
+-	  write_personal(personal_stream);
+-	  if(personal_home)
+-	    unlink(personal_home);
+-	  personal_home = NULL;
+-	}
+-      else
+-	{
+ 	  if(!home_stream)
+ 	    home_stream = get_lock(personal_home, 1);
+ 	  if(home_stream)
+ 	    write_personal(home_stream);
+ 	  else
+ 	    personal_home = NULL;
+-	  personal_file = personal_home;
+-	  personal_home = NULL;
+-	}
+-      personal_make = 0;
+     }
+   /*}}}*/
+-  if(personal_stream)
+-    get_unlock(personal_stream);
+   if(home_stream)
+     get_unlock(home_stream);
+   if(score_stream)
+     get_unlock(score_stream);
+   if(do_score && score_file)
+     file_changed(score_file);
+-  if(do_personal && personal_file)
+-    file_changed(personal_file);
++  if(do_personal && personal_home)
++    file_changed(personal_home);
+   return;
+ }
+ /*}}}*/
+@@ -1103,7 +1028,7 @@ FUNCARG((stream),
+   if(failed)
+     {
+       fprintf(stderr, "%s:Your personal score file '%s' has been corrupted.\n",
+-	  myname, personal_file);
++	  myname, personal_home);
+       scoring.personal[0].score = 0;
+     }
+   return failed;
+diff --git a/xmris.man b/xmris.man
+index f108e24..ae881c0 100644
+--- a/xmris.man
++++ b/xmris.man
+@@ -846,21 +846,9 @@ directory containing it must be writable by Mr Is.
+ .br
+ .ne 3
+ .TP
+-.PD 0
+-.B .../xmris-<name>
+-.TP
+ .B ~/.xmris.score
+ .PD
+-One of these files is used to store the personal best scores.
+-Mr Is first looks for the personal score file in the score directory and
+-then in the home directory. If a personal
+-score file cannot be found, Mr Is attempts to create one. 
+-If the file is found in the user's home directory, Mr Is attempts
+-to move it to the score directory. Mr Is
+-will attempt to create the personal files in the score directory. If this
+-cannot be done, the personal score file is placed in the home directory. In
+-order to create the personal score file in the score directory, Mr Is will
+-have to have the correct access rights.
++This file is used to store the personal best scores.
+ .br
+ .ne 5
+ .TP
+-- 
+1.7.5
+

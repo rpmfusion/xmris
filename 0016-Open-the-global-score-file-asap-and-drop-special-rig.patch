@@ -1,0 +1,123 @@
+From 74743124c7cd2ed7ff5e33e436a73d3f0f70ce6a Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Sun, 1 May 2011 11:12:09 +0200
+Subject: [PATCH 16/20] Open the global score file asap, and drop special
+ rights directly after
+
+This completes making the highscore code truely safe for sgid usage.
+---
+ Imakefile |    4 ++--
+ scoring.c |   42 ++++++++++++++++++++++++++++++++----------
+ xmris.c   |    2 ++
+ xmris.h   |    1 +
+ 4 files changed, 37 insertions(+), 12 deletions(-)
+
+diff --git a/Imakefile b/Imakefile
+index dcf93c8..09931d8 100644
+--- a/Imakefile
++++ b/Imakefile
+@@ -85,9 +85,9 @@ XCOMM install parameters
+ XCOMM
+ XCOMM owner and access rights for executable & score directory
+ XCOMM these are set for a setuid xmris
+-XCOMM OWNER = -o games
++XCOMM OWNER = -g games
+ OWNER =
+-INSTMRISFLAGS = $(OWNER) $(INSTUIDFLAGS)
++INSTMRISFLAGS = $(OWNER) $(INSTGIDFLAGS)
+ XCOMM normal install locations
+ THEBINDIR = $(BINDIR)
+ THEMANDIR = $(MANDIR)
+diff --git a/scoring.c b/scoring.c
+index 381057b..45c14d8 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -1,4 +1,5 @@
+ /* Copyright (C) 1993, 1992 Nathan Sidwell */
++#define _GNU_SOURCE /* for setresuid / setresgid */
+ #include "xmris.h"
+ /*{{{  other includes*/
+ #include <pwd.h>
+@@ -169,6 +170,37 @@ ARGSEP  unsigned long msec
+   return;
+ }
+ /*}}}*/
++/*{{{  void init_scores_early()*/
++extern VOIDFUNC init_scores_early FUNCARGVOID
++/*
++ * To be called asap from main, open the global highscore file and drop
++ * sgid rights
++ */
++{
++  /* Figure out who we really are. */
++  gid_t realgid = getgid();
++  uid_t realuid = getuid();
++
++  score_stream = fopen(score_file, "r+");
++  /* If we cannot open it, try creating it */
++  if(!score_stream)
++    score_stream = fopen(score_file, "w+");
++  if(!score_stream)
++    score_file = NULL;
++
++  /* This is where we drop our setuid/setgid privileges. */
++  if(setresgid(-1, realgid, realgid) != 0)
++    {
++      perror("Could not drop setgid privileges.  Aborting.");
++      exit(1);
++    }
++  if(setresuid(-1, realuid, realuid) != 0)
++    {
++      perror("Could not drop setuid privileges.  Aborting.");
++      exit(1);
++    }
++}
++/*}}}*/
+ /*{{{  void init_scores()*/
+ extern VOIDFUNC init_scores FUNCARGVOID
+ /*
+@@ -277,16 +309,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+       scoring.alternate = alternate;
+   }
+   /*}}}*/
+-  /*{{{  score directory?*/
+-    {
+-      score_stream = fopen(score_file, "r+");
+-      /* If we cannot open it, try creating it */
+-      if(!score_stream)
+-	score_stream = fopen(score_file, "w+");
+-      if (!score_stream)
+-	score_file = NULL;
+-    }
+-  /*}}}*/
+   /*{{{  personal file*/
+   {
+     if(!home)
+diff --git a/xmris.c b/xmris.c
+index f10e3f7..a38139d 100644
+--- a/xmris.c
++++ b/xmris.c
+@@ -1259,6 +1259,8 @@ ARGSEP  char CONST **argv
+   PROTOANIMATE((*animate));
+   Atom wm_delete_window;
+   
++  init_scores_early();
++  
+   myname = *argv ? *argv : "Xmris";
+   open_toolkit(argc, (String *)argv);
+   init_scores();
+diff --git a/xmris.h b/xmris.h
+index 34969df..99af882 100644
+--- a/xmris.h
++++ b/xmris.h
+@@ -535,6 +535,7 @@ extern unsigned move_player PROTOARG((VOIDARG));
+ /*{{{  scoring*/
+ extern VOIDFUNC check_scores PROTOARG((VOIDARG));
+ extern VOIDFUNC high_score PROTOARG((unsigned long, unsigned, unsigned long));
++extern VOIDFUNC init_scores_early PROTOARG((VOIDARG));
+ extern VOIDFUNC init_scores PROTOARG((VOIDARG));
+ extern VOIDFUNC cleanup_scores PROTOARG((VOIDARG));
+ /*}}}*/
+-- 
+1.7.5
+

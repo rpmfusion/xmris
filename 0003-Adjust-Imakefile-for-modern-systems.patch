@@ -1,0 +1,94 @@
+From e9da98bfc559f227fe7784f227ff631e2a774c3f Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 29 Nov 2010 23:18:26 +0100
+Subject: [PATCH 03/20] Adjust Imakefile for modern systems
+
+---
+ Imakefile |   27 ++++++++++++---------------
+ 1 files changed, 12 insertions(+), 15 deletions(-)
+
+diff --git a/Imakefile b/Imakefile
+index 43345c6..a6c6842 100644
+--- a/Imakefile
++++ b/Imakefile
+@@ -31,10 +31,10 @@ install.man :: @@\
+ XCOMM compiler options
+ XCOMM
+ #if HasGcc
+-EXTRACCOPTIONS = -Wall -Wpointer-arith -Wwrite-strings -Wtraditional
++EXTRACCOPTIONS = -Wall -Wpointer-arith -Wno-write-strings
+ #endif /* HasGcc */
+ #if defined(LinuxArchitecture)
+-#define STATICDEBUG -static
++#define STATICDEBUG
+ XCOMM XINTL=-lXintl
+ #else
+ #define STATICDEBUG
+@@ -61,7 +61,7 @@ TIME =
+ XCOMM TIME = -DUSETIME
+ XCOMM don't you have lockf or flock?
+ LOCK =
+-LOCK = -DUSELOCKFILE
++XCOMM LOCK = -DUSELOCKFILE
+ 
+ XCOMM game defaults, you probably only want to alter the SCORE
+ XCOMM
+@@ -69,9 +69,9 @@ XCOMM
+ /* #define thefont "-*-courier-*-r-*-*-18-*-*-*-m-*-*-*" */
+ XCOMM where is the high score file?
+ XCOMM SCORE = $(LOCAL)/lib/$(APP)
+-SCORE = /var/lib/games/$(APP)
+-/* to install default gardens not in app_defaults/$(APP)
+-/* #define InstallDefaultGardens $(SCORE)/gardens */
++SCORE = /var/games/$(APP)
++/* to install default gardens not in /usr/share/$(APP) */
++/* #define InstallDefaultGardens $(DESTDIR)/usr/share/$(APP) */
+ 
+ XCOMM The following defines are needed for some implementations and/or sites.
+ XCOMM It is xmkmf's job to get these right in the first place.
+@@ -91,7 +91,8 @@ XCOMM install parameters
+ XCOMM
+ XCOMM owner and access rights for executable & score directory
+ XCOMM these are set for a setuid xmris
+-OWNER = -o games
++XCOMM OWNER = -o games
++OWNER =
+ INSTSCOREFLAGS = $(OWNER) -m 755
+ INSTMRISFLAGS = $(OWNER) $(INSTUIDFLAGS)
+ XCOMM normal install locations
+@@ -115,7 +116,7 @@ FONT = thefont
+ 
+ #ifndef InstallDefaultGardens
+ #ifdef InstallAppDefFiles
+-#define InstallDefaultGardens $(DESTDIR)/$(XAPPLOADDIR)/$(APP)
++#define InstallDefaultGardens $(DESTDIR)/usr/share/$(APP)
+ #endif
+ #endif
+ 
+@@ -213,10 +214,6 @@ XCOMM using alltarget can cause gnumake to try and make a target called all.
+ XCOMM the reason is the All Target macro has no rules, so gnumake tries
+ XCOMM to find an implicit one. Other makes just give up.
+ all :: initialize
+-	@echo "NOTE:You might get lots of warnings about discarding const from"
+-	@echo "NOTE:pointer target type. Ignore these. It's because the X header"
+-	@echo "NOTE:files aren't const correct. Fiddle with XrmOptionDescRec in"
+-	@echo "NOTE:Xresource.h and String in Intrinsic.h by adding an _Xconst."
+ 	@#keep gnumake happy
+ 
+ all :: xmris xmred
+@@ -238,9 +235,9 @@ NormalProgramTarget(xmris,$(MRISOBJS),$(DEPLIBS),$(LOCAL_LIBRARIES),)
+ 
+ InstallProgramWithFlags(xmris,$(THEBINDIR),$(INSTMRISFLAGS))
+ 
+-install :: $(THEBINDIR)/xmris
+-	$(RM) $(THEBINDIR)/xmsit
+-	$(LN) ./xmris $(THEBINDIR)/xmsit
++install :: $(DESTDIR)$(THEBINDIR)/xmris
++	$(RM) $(DESTDIR)$(THEBINDIR)/xmsit
++	$(LN) xmris $(DESTDIR)$(THEBINDIR)/xmsit
+ 
+ XCOMM xmred build
+ NormalProgramTarget(xmred,$(MREDOBJS) $(WIDGETOBJS),$(DEPLIBS),$(LOCAL_LIBRARIES) -lm,)
+-- 
+1.7.5
+

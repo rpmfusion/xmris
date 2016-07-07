@@ -1,0 +1,87 @@
+From 5ffc5a653acb6f4d9747f98d05e3a86119baeb9f Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 29 Nov 2010 22:28:49 +0100
+Subject: [PATCH 04/20] Catch the window being deleted
+
+This fixes the keyboard repeat getting fsck-ed up when quiting using
+the window delete button on the title bar / alt+f4 while playing the game.
+
+This patch comes from the Mandriva SRPM, thanks guys!
+---
+ xmris.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
+
+diff --git a/xmris.c b/xmris.c
+index 77cd0ea..22fa1af 100644
+--- a/xmris.c
++++ b/xmris.c
+@@ -55,6 +55,8 @@ static VOIDFUNC action_pause
+     PROTOARG((Widget, XEvent *, String *, Cardinal *));
+ static VOIDFUNC action_unmap
+     PROTOARG((Widget, XEvent *, String *, Cardinal *));
++static VOIDFUNC action_quit
++    PROTOARG((Widget, XEvent *, String *, Cardinal *));
+ static VOIDFUNC age_scores PROTOARG((VOIDARG));
+ static PROTOANIMATE(animate_death);
+ static PROTOANIMATE(animate_pause);
+@@ -75,6 +77,7 @@ static XtActionsRec actions[] =
+   {"map", action_map},
+   {"unmap", action_unmap},
+   {"expose", action_expose},
++  {"quit", action_quit},
+ };
+ /*}}}*/
+ /*{{{  static char CONST garden_translations[] =*/
+@@ -96,6 +99,7 @@ static char CONST toplevel_translations[] =
+ "\
+ <MapNotify>:map()\n\
+ <UnmapNotify>:unmap()\n\
++<Message>WM_PROTOCOLS: quit()\n\
+ ";
+ /*}}}*/
+ /*}}}*/
+@@ -116,6 +120,22 @@ ARGSEP  Cardinal  *num_params
+   return;
+ }
+ /*}}}*/
++/*{{{  void action_quit(widget, event, params, num_params)*/
++static VOIDFUNC action_quit
++FUNCARG((widget, event, params, num_params),
++	Widget    widget
++ARGSEP  XEvent    *event
++ARGSEP  String    *params
++ARGSEP  Cardinal  *num_params
++)
++{
++#ifdef DEBUGEVENTLOOP
++  fprintf(stderr, "action_quit(0x%lx)\n", XtWindow(widget));
++#endif /* DEBUGEVENTLOOP */
++  set_key_default();
++  global.quit = 1;
++}
++/*}}}*/
+ /*{{{  void action_keypress(widget, event, params, num_params)*/
+ static VOIDFUNC action_keypress
+ FUNCARG((widget, event, params, num_params),
+@@ -1235,6 +1255,7 @@ ARGSEP  char CONST **argv
+ )
+ {
+   PROTOANIMATE((*animate));
++  Atom wm_delete_window;
+   
+   myname = *argv ? *argv : "Xmris";
+ #ifndef TRANSPUTER
+@@ -1280,6 +1301,10 @@ ARGSEP  char CONST **argv
+   XtOverrideTranslations(display.toplevel,
+       XtParseTranslationTable(toplevel_translations));
+   XtRealizeWidget(display.toplevel);
++  wm_delete_window = XInternAtom(XtDisplay(display.toplevel), "WM_DELETE_WINDOW",
++				 False);
++  (void)XSetWMProtocols(XtDisplay(display.toplevel), XtWindow(display.toplevel),
++			&wm_delete_window, 1);
+ #ifdef DEBUGEVENTLOOP
+   printf("Toplevel is 0x%lx\n", (long)XtWindow(display.toplevel));
+   printf("Garden is 0x%lx\n", (long)XtWindow(display.garden));
+-- 
+1.7.5
+

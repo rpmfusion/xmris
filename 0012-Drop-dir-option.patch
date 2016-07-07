@@ -1,0 +1,467 @@
+From ff2baedb64e331b3a3742be72461d37307257c11 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Sat, 30 Apr 2011 12:43:03 +0200
+Subject: [PATCH 12/20] Drop -dir option
+
+Allowing the user to specify the directory in which files will be created
+using elevated rights, seems like a bad idea.
+---
+ Imakefile    |   33 +++------------------------------
+ Makefile.std |   35 +++--------------------------------
+ README       |   10 ----------
+ Xmris-ad.src |    1 -
+ common.h     |    1 -
+ defcom.c     |    5 -----
+ draw.c       |    4 ----
+ makemris.c   |    6 ------
+ scoring.c    |   15 ++++++---------
+ xmris.h      |    8 --------
+ xmris.man    |   28 +++++-----------------------
+ 11 files changed, 17 insertions(+), 129 deletions(-)
+
+diff --git a/Imakefile b/Imakefile
+index ad062d7..dcf93c8 100644
+--- a/Imakefile
++++ b/Imakefile
+@@ -60,13 +60,10 @@ XCOMM don't you have gettimeofday?
+ TIME =
+ XCOMM TIME = -DUSETIME
+ 
+-XCOMM game defaults, you probably only want to alter the SCORE
++XCOMM game defaults, you probably do not want to alter these
+ XCOMM
+ /* You must specify a fixed width font that exists. */
+ /* #define thefont "-*-courier-*-r-*-*-18-*-*-*-m-*-*-*" */
+-XCOMM where is the high score file?
+-XCOMM SCORE = $(LOCAL)/lib/$(APP)
+-SCORE = /var/games/$(APP)
+ /* to install default gardens not in /usr/share/$(APP) */
+ /* #define InstallDefaultGardens $(DESTDIR)/usr/share/$(APP) */
+ 
+@@ -90,14 +87,10 @@ XCOMM owner and access rights for executable & score directory
+ XCOMM these are set for a setuid xmris
+ XCOMM OWNER = -o games
+ OWNER =
+-INSTSCOREFLAGS = $(OWNER) -m 755
+ INSTMRISFLAGS = $(OWNER) $(INSTUIDFLAGS)
+ XCOMM normal install locations
+ THEBINDIR = $(BINDIR)
+ THEMANDIR = $(MANDIR)
+-XCOMM for open access you want 777 and $(INSTPGMFLAGS),
+-XCOMM (the personal score files go in users' home dirs.)
+-XCOMM INSTSCOREFLAGS = -m 777
+ XCOMM INSTMRISFLAGS = $(INSTPGMFLAGS)
+ XCOMM If you're not installing in the default locations
+ XCOMM DESTDIR = 
+@@ -118,7 +111,7 @@ FONT = thefont
+ #endif
+ 
+ DEFINES = $(EXTRACCOPTIONS) -DFONT_NAME='$(FONT)' $(NDEBUG) \
+-	-DSCORE_DIR='"$(SCORE)"' $(TIME) $(KNR) -DSCROLLBARBUGFIX
++	$(TIME) $(KNR) -DSCROLLBARBUGFIX
+ LOCAL_LIBRARIES = $(XAWLIB) $(XTOOLLIB) $(XMULIB) $(XINTL) $(XLIB) $(MATHSLIB)
+ DEPLIBS = $(DEPXLIB)
+ 
+@@ -260,24 +253,7 @@ XCOMM application resource files
+ InstallAppDefaults(Xmris)
+ 
+ Xmris.ad : Xmris-ad.src
+-	sed -e 's@SCORE@$(SCORE)@' -e s@FONT@$(FONT)@ < Xmris-ad.src > Xmris.ad
+-
+-XCOMM score directory install
+-install ::
+-	MakeDir($(SCORE))
+-	@#not all $(INSTALL) have a -d flag, have to do it explicitly
+-	@echo installing $(INSTSCOREFLAGS) $(SCORE)
+-	@set -- $(INSTSCOREFLAGS) ; \
+-	while [ $$# -ne 0 ] ; \
+-	do \
+-	case "$$1" in \
+-	"-o") shift ; chown $$1 $(SCORE) ; echo owner is $$1 ;; \
+-	"-m") shift ; chmod $$1 $(SCORE) ;; \
+-	"-g") shift ; chgrp $$1 $(SCORE) ; echo group is $$1 ;; \
+-	*) echo unknown option '$$1' ;; \
+-	esac ; \
+-	shift ; \
+-	done
++	sed -e s@FONT@$(FONT)@ < Xmris-ad.src > Xmris.ad
+ 
+ #ifdef InstallDefaultGardens
+ XCOMM install default gardens
+@@ -848,9 +824,6 @@ initialize :
+ 	@if [ `ls -t Makefile Imakefile | sed '2,$$d'` = Imakefile ] ; then \
+ 	  echo Warning:Makefile is older than Imakefile ; \
+ 	fi
+-	@if [ ! -d `echo '$(SCORE)' | sed 's=/[^/]*$$=='` ] ; then \
+-	  echo The parent of $(SCORE) does not exist ; \
+-	fi
+ 	@if [ $(FONT) = "" ] ; then true ; \
+ 	elif echo $(FONT) | grep -c -- '-m-.*-.*-.*$$' > /dev/null ; then \
+ 	  if [ "$(XLSFONTS)" = "" -o "$(DISPLAY)" = "" ] ; then \
+diff --git a/Makefile.std b/Makefile.std
+index 39b8935..84fdd8e 100644
+--- a/Makefile.std
++++ b/Makefile.std
+@@ -435,13 +435,9 @@ KNR =
+ TIME =
+ # TIME = -DUSETIME
+ 
+-# game defaults, you probably only want to alter the SCORE
++# game defaults, you probably do not want to alter these
+ #
+ 
+-# where is the high score file?
+-# SCORE = $(LOCAL)/lib/$(APP)
+-SCORE = $(LIBDIR)/$(APP)
+-
+ # The following defines are needed for some implementations and/or sites.
+ # It is xmkmf's job to get these right in the first place.
+ # If you have to declare any of these, X may not be installed correctly.
+@@ -462,14 +458,10 @@ SCORE = $(LIBDIR)/$(APP)
+ # owner and access rights for executable & score directory
+ # these are set for a setuid xmris
+ OWNER = -o games
+-INSTSCOREFLAGS = $(OWNER) -m 755
+ INSTMRISFLAGS = $(OWNER) $(INSTUIDFLAGS)
+ # normal install locations
+ THEBINDIR = $(BINDIR)
+ THEMANDIR = $(MANDIR)
+-# for open access you want 777 and $(INSTPGMFLAGS),
+-# (the personal score files go in users' home dirs.)
+-# INSTSCOREFLAGS = -m 777
+ # INSTMRISFLAGS = $(INSTPGMFLAGS)
+ # If you're not installing in the default locations
+ # DESTDIR =
+@@ -485,7 +477,7 @@ COFLAGS = -l
+ RCSFLAGS =
+ 
+ DEFINES = $(EXTRACCOPTIONS) -DFONT_NAME='$(FONT)' $(NDEBUG) \
+-	-DSCORE_DIR='"$(SCORE)"' $(TIME) $(KNR) -DSCROLLBARBUGFIX
++	$(TIME) $(KNR) -DSCROLLBARBUGFIX
+ LOCAL_LIBRARIES = $(XAWLIB) $(XTOOLLIB) $(XMULIB) $(XLIB) $(MATHSLIB)
+ DEPLIBS = $(DEPXLIB)
+ 
+@@ -665,25 +657,7 @@ install:: Xmris.ad
+ 	$(INSTALL) $(INSTALLFLAGS) $(INSTAPPFLAGS) Xmris.ad $(DESTDIR)$(XAPPLOADDIR)/Xmris
+ 
+ Xmris.ad : Xmris-ad.src
+-	sed -e 's@SCORE@$(SCORE)@' -e s@FONT@$(FONT)@ < Xmris-ad.src > Xmris.ad
+-
+-# score directory install
+-install ::
+-	@if [ -d $(SCORE) ]; then set +x; \
+-	else (set -x; $(MKDIRHIER) $(SCORE)); fi
+-	@#not all $(INSTALL) have a -d flag, have to do it explicitly
+-	@echo installing $(INSTSCOREFLAGS) $(SCORE)
+-	@set -- $(INSTSCOREFLAGS) ; \
+-	while [ $$# -ne 0 ] ; \
+-	do \
+-	case "$$1" in \
+-	"-o") shift ; chown $$1 $(SCORE) ; echo owner is $$1 ;; \
+-	"-m") shift ; chmod $$1 $(SCORE) ;; \
+-	"-g") shift ; chgrp $$1 $(SCORE) ; echo group is $$1 ;; \
+-	*) echo unknown option '$$1' ;; \
+-	esac ; \
+-	shift ; \
+-	done
++	sed -e s@FONT@$(FONT)@ < Xmris-ad.src > Xmris.ad
+ 
+ # install default gardens
+ install :: $(GARDENS)
+@@ -1257,9 +1231,6 @@ initialize :
+ 	@if [ `ls -t Makefile Imakefile | sed '2,$$d'` = Imakefile ] ; then \
+ 	  echo Warning:Makefile is older than Imakefile ; \
+ 	fi
+-	@if [ ! -d `echo '$(SCORE)' | sed 's=/[^/]*$$=='` ] ; then \
+-	  echo The parent of $(SCORE) does not exist ; \
+-	fi
+ 	@if [ $(FONT) = "" ] ; then true ; \
+ 	elif echo $(FONT) | grep -c -- '-m-.*-.*-.*$$' > /dev/null ; then \
+ 	  if [ "$(XLSFONTS)" = "" -o "$(DISPLAY)" = "" ] ; then \
+diff --git a/README b/README
+index f6c80b0..58dc90a 100644
+--- a/README
++++ b/README
+@@ -29,16 +29,6 @@ the define USETIME, this will give less accurate timing. Also
+ gettimeofday may or may not need a timezone argument, this is checked
+ by the system type in timer.c.
+ 
+-Set SCORE to the name of the high score directory.
+-The score file uses lockf or flock by default, this doesn't work
+-on some distributed filing systems. If so,
+-define USELOCKFILE, and a lock file is used to do the locking with
+-open(O_CREAT | O_EXCL). The name of the lock file is xmris.lock.
+-For this to work the high score directory must be writeable, which
+-is not the case with lockf. Personal high score files are also put
+-in this directory, if xmris can create them there, otherwise they
+-will be put in the users' home directory.
+-
+ You may need to force static linking, and not use shared libraries, or
+ store a library load path with the binary with the linker -R option.
+ The EXTRA_LOAD_FLAGS can be used for this. (This may be necessary for
+diff --git a/Xmris-ad.src b/Xmris-ad.src
+index 60be0ac..6368076 100644
+--- a/Xmris-ad.src
++++ b/Xmris-ad.src
+@@ -13,7 +13,6 @@
+ *Quit:			q
+ *Iconize:		i
+ *Keyboard:		k
+-*Dir:			SCORE
+ *ReverseVideo:		no
+ *Monochrome:		no
+ *Gender:		he
+diff --git a/common.h b/common.h
+index 0babbce..b146a47 100644
+--- a/common.h
++++ b/common.h
+@@ -280,7 +280,6 @@ typedef struct Data
+ {
+   Font    font;     /* font to use */
+ #ifndef XMRED
+-  String  dir;      /* score directory */
+   String  expire;   /* expiration */
+   String  remove;   /* removal */
+   String  boards;   /* board definitions */
+diff --git a/defcom.c b/defcom.c
+index 9715fe9..1c63cbc 100644
+--- a/defcom.c
++++ b/defcom.c
+@@ -193,7 +193,6 @@ CommandOptionDesc command_options[] =
+   {"-remove",  1,  XtOffsetOf(DATA, remove)},
+   {"-nodisplay",0, XtOffsetOf(DATA, nodisplay)},
+   {"+display", 0,  XtOffsetOf(DATA, nodisplay)},
+-  {"-dir",     1,  XtOffsetOf(DATA, dir)},
+ #endif /* XMRED */
+   {NULL}
+ };
+@@ -228,9 +227,6 @@ XrmOptionDescRec options[] =
+ XtResource resources[] =
+ {
+ #ifndef XMRED
+-  /* dir must be first */
+-  {"dir", "Dir", XtRString, sizeof(String),
+-      XtOffsetOf(DATA, dir), XtRString, (XtPointer)SCORE_DIR},
+   {"up", "Up", XtRKeySym, sizeof(KeySym),
+       XtOffsetOf(DATA, keysyms[0]), XtRString, (XtPointer)"Up"},
+   {"down", "Down", XtRKeySym, sizeof(KeySym),
+@@ -371,7 +367,6 @@ HELP CONST help[] =
+   {"Modern sprites",                "-msit",      "Gender:she", ""},
+ #ifndef XMRED
+   {"Random apples",                 "-random",    "Random:yes", ""},
+-  {"High score directory",          "-dir",       "Dir:", "<directory>"},
+   {"Use username in score",         "-username",  "UserName:yes", ""},
+   {"Use realname in score",         "-realname",  "UserName:no", ""},
+ #endif /* XMRED */
+diff --git a/draw.c b/draw.c
+index ea0f65d..fcf5401 100644
+--- a/draw.c
++++ b/draw.c
+@@ -1039,10 +1039,6 @@ ARGSEP  char CONST *parent
+ 	      if(!lib)
+ 		lib = XtResolvePathname(display.display, "app-defaults/xmris",
+ 		    name, FILE_SUFFIX, NULL, NULL, 0, NULL);
+-	      if(!lib && data.dir)
+-		lib = XtResolvePathname(display.display, data.dir, name,
+-		    FILE_SUFFIX, "%T/%N:%T/%N%S:%T/gardens/%N:%T/gardens/%N%S",
+-		    NULL, 0, NULL);
+ 	      if(lib)
+ 		{
+ 		  XtFree(filename);
+diff --git a/makemris.c b/makemris.c
+index 4bf8d20..95046d7 100644
+--- a/makemris.c
++++ b/makemris.c
+@@ -309,7 +309,6 @@ ARGSEP  String  *argv
+ 	/*{{{  some more setup*/
+ 	{
+ 	  XtResource CONST *ptr;
+-	  char *dir;
+ 	  
+ 	  XtAppSetTypeConverter(display.context, XtRString, XtRKeySym,
+ 	      convert_string2keysym, (XtConvertArgRec *)NULL, 0, XtCacheNone,
+@@ -320,13 +319,10 @@ ARGSEP  String  *argv
+ 	      (void (*)PROTOARG((XtAppContext, XrmValue *, XtPointer,
+ 		  XrmValue *, Cardinal *)))NULL);
+ 	  display.display = XtDisplay(display.toplevel);
+-	  dir = data.dir;
+ 	  for(ptr = resources; *(char CONST **)ptr; ptr++)
+ 	    /* EMPTY */;
+ 	  XtGetApplicationResources(display.toplevel, (XtPointer)&data,
+ 	      resources, (Cardinal)(ptr - resources), (Arg *)NULL, 0);
+-	  if(dir)
+-	    data.dir = dir;
+ 	  gettoplevelresources();
+ 	  XtVaSetValues(display.toplevel,
+ 	      XtNtitle, (XtArgVal)names[data.gender != False],
+@@ -340,8 +336,6 @@ ARGSEP  String  *argv
+ 	  }
+ 	}
+ 	/*}}}*/
+-      if(!data.dir)
+-	data.dir = (char *)resources[0].default_addr;
+     }
+     /*}}}*/
+   return;
+diff --git a/scoring.c b/scoring.c
+index ede2f07..2e93b30 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -17,6 +17,7 @@
+ #endif /* SYSV */
+ /*}}}*/
+ /*{{{  static*/
++static CONST char *score_dir = "/var/games";
+ static CONST char date_formats[4] = "DMY";
+ static char     *score_file = NULL;   /* high score file name */
+ static char     *personal_file = NULL;  /* personal in high score dir */
+@@ -287,25 +288,22 @@ extern VOIDFUNC init_scores FUNCARGVOID
+       scoring.alternate = alternate;
+   }
+   /*}}}*/
+-  dirlen = data.dir ? strlen(data.dir) : 0;
+-  if(dirlen && data.dir[dirlen - 1] == '/')
+-    dirlen--;
+   /*{{{  score directory?*/
+-  if(dirlen)
+     {
+       size_t    nlen;
+   
++      dirlen = strlen(score_dir);
+       score_file = malloc(dirlen + 14);
+       if(score_file)
+ 	{
+-	  strcpy(score_file, data.dir);
++	  strcpy(score_file, score_dir);
+ 	  strcpy(&score_file[dirlen], "/xmris.score");
+ 	}
+       nlen = strlen(user);
+       personal_file = malloc(dirlen + 8 + nlen);
+       if(personal_file)
+ 	{
+-	  strcpy(personal_file, data.dir);
++	  strcpy(personal_file, score_dir);
+ 	  strcpy(&personal_file[dirlen], "/xmris-");
+ 	  strcpy(&personal_file[dirlen + 7], user);
+ 	}
+@@ -591,16 +589,15 @@ FUNCARG((insert),
+ 	  /*{{{  try personal files too*/
+ 	  {
+ 	    /*{{{  score directory?*/
+-	    if(data.dir)
+ 	      {
+ 		size_t    dirlen;
+ 		char      *file;
+ 		
+-		dirlen = strlen(data.dir);
++		dirlen = strlen(score_dir);
+ 		file = malloc(dirlen + 8 + strlen(data.remove));
+ 		if(file)
+ 		  {
+-		    strcpy(file, data.dir);
++		    strcpy(file, score_dir);
+ 		    strcpy(&file[dirlen], "/xmris-");
+ 		    strcpy(&file[dirlen + 7], data.remove);
+ 		    if(!unlink(file))
+diff --git a/xmris.h b/xmris.h
+index 1802e87..1e696c5 100644
+--- a/xmris.h
++++ b/xmris.h
+@@ -13,11 +13,6 @@
+ #define FUNCANIMATE(name, arg) PROTOVOID(*name(arg)) PROTOVOID(*arg);
+ #endif
+ /*}}}*/
+-/*{{{  check score*/
+-#ifndef SCORE_DIR
+-  #error No default score directory
+-#endif /* SCORE_DIR */
+-/*}}}*/
+ /*{{{  defines*/
+ /*{{{  board sizes*/
+ #define KNOCK_THROUGH /* how far we go to knock through a new cell */\
+@@ -41,9 +36,6 @@
+ #define SCORE_SCALE 1024    /* precision of score scaling */
+ /*}}}*/
+ /*{{{  score file*/
+-#ifndef SCORE_DIR
+-#define SCORE_DIR NULL
+-#endif /* SCORE_DIR */
+ #define SCORE_THRESHOLD 10000 /* minimum score for fame */
+ #define SCORE_ROUND     5     /* scores are rounded */
+ #define HIGH_SCORES (CELLS_DOWN - 2)
+diff --git a/xmris.man b/xmris.man
+index 3fe5028..f108e24 100644
+--- a/xmris.man
++++ b/xmris.man
+@@ -231,17 +231,12 @@ is still being used for the initial part of the frame delay.
+ .br
+ .ne 3
+ .TP
+-.B \-dir \fIscore-directory\fP
+-Specify a different score directory.
+-.br
+-.ne 4
+-.TP
+ .PD 0
+ .B \-username
+ .TP
+ .B \-realname
+ .PD
+-The name for the score file can be either the username or the real name.
++The name inside the score file can be either the username or the real name.
+ These options select which to use. The default is to use the real name.
+ If the real name is unobtainable, the username will
+ be used anyway. If the current score file has an entry by the other
+@@ -257,10 +252,8 @@ the Mr Is subdirectory of app-defaults. These are explained below.
+ .ne 3
+ .TP
+ .B \-scores
+-List the high scores to stdout. Does not start the game. Note that this
+-will still need to open an X display, in order to read the X resources
+-(which may affect the score directory). If you don't want the defaults
+-read, use the +display option too.
++List the high scores to stdout. Does not start the game. An X display
++will still be opened. The +display option may be used to prevent this.
+ .br
+ .ne 4
+ .TP
+@@ -422,11 +415,6 @@ sensitive.
+ .br
+ .ne 3
+ .TP
+-.B Xmris.Dir: \fIscore-directory\fP
+-The name of the high score directory.
+-.br
+-.ne 3
+-.TP
+ .B Xmris.UserName: \fI{yes, no}\fP [no]
+ Selects whether the username or real name should be used for your entry
+ in the high score table.
+@@ -851,9 +839,8 @@ following names.
+ .br
+ .ne 3
+ .TP
+-.B .../xmris.score
+-The high score file. The directory is system dependent, and may be
+-changed by application resource or option.
++.B /var/games/xmris.score
++The high score file.
+ This file must either exist and be writable to by Mr Is, or the
+ directory containing it must be writable by Mr Is.
+ .br
+@@ -888,12 +875,7 @@ See X for information about how these are searched.
+ .br
+ .ne 6
+ .TP
+-.PD 0
+ .B .../app-defaults/xmris/<gardens>
+-.TP
+-.B <score-dir>/<gardens>
+-.TP
+-.B <score-dir>/gardens/<gardens>
+ .PD
+ Search path for loadable gardens. The suffix ".gdn" is appended to the
+ filename, if required.
+-- 
+1.7.5
+

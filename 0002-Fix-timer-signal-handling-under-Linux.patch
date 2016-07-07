@@ -1,0 +1,38 @@
+From 10e609fae72b30ee7763e95f202d3ecad13685e6 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 29 Nov 2010 23:26:44 +0100
+Subject: [PATCH 02/20] Fix timer signal handling under Linux
+
+---
+ timer.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/timer.c b/timer.c
+index 4f56727..c8fa2c1 100644
+--- a/timer.c
++++ b/timer.c
+@@ -75,7 +75,7 @@
+  * signal_release returns the block mask to what it was before signal_hold
+  */
+ #ifndef TRANSPUTER
+-#ifdef POSIX
++#if defined POSIX || defined linux
+ #  define MASK sigset_t
+ #  define signal_hold(signal, maskp) \
+     {\
+@@ -85,7 +85,11 @@
+       sigprocmask(SIG_BLOCK, &temp, (maskp)); \
+     }
+ #  define signal_release(maskp) sigprocmask(SIG_SETMASK, maskp, (MASK *)NULL)
+-#  define signal_pause(maskp) sigpause(*(maskp))
++#  ifdef linux
++#    define signal_pause(maskp) sigsuspend(maskp)
++#  else
++#    define signal_pause(maskp) sigpause(*(maskp))
++#  endif
+ #else
+ #  ifdef __hpux /* hpux is a weird mixture of BSD & SYSV */
+ /* don't know if this is right */
+-- 
+1.7.5
+

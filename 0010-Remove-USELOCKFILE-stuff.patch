@@ -1,0 +1,262 @@
+From 4f1962e509a1338bd607937b6e55f9a82023d6ba Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Fri, 29 Apr 2011 17:19:05 +0200
+Subject: [PATCH 10/20] Remove USELOCKFILE stuff
+
+Removing this is a preparation step for cleaning up the highscore
+support for dropping setgid rights directly on start, rather then using
+unsafe seteg/uid tricks. In this mode using a separate lockfile is not
+supported.
+---
+ Imakefile    |    5 +--
+ Makefile.std |    5 +--
+ scoring.c    |  102 ----------------------------------------------------------
+ xmris.man    |   14 +-------
+ 4 files changed, 3 insertions(+), 123 deletions(-)
+
+diff --git a/Imakefile b/Imakefile
+index a6c6842..ad062d7 100644
+--- a/Imakefile
++++ b/Imakefile
+@@ -59,9 +59,6 @@ XCOMM
+ XCOMM don't you have gettimeofday?
+ TIME =
+ XCOMM TIME = -DUSETIME
+-XCOMM don't you have lockf or flock?
+-LOCK =
+-XCOMM LOCK = -DUSELOCKFILE
+ 
+ XCOMM game defaults, you probably only want to alter the SCORE
+ XCOMM
+@@ -121,7 +118,7 @@ FONT = thefont
+ #endif
+ 
+ DEFINES = $(EXTRACCOPTIONS) -DFONT_NAME='$(FONT)' $(NDEBUG) \
+-	-DSCORE_DIR='"$(SCORE)"' $(LOCK) $(TIME) $(KNR) -DSCROLLBARBUGFIX
++	-DSCORE_DIR='"$(SCORE)"' $(TIME) $(KNR) -DSCROLLBARBUGFIX
+ LOCAL_LIBRARIES = $(XAWLIB) $(XTOOLLIB) $(XMULIB) $(XINTL) $(XLIB) $(MATHSLIB)
+ DEPLIBS = $(DEPXLIB)
+ 
+diff --git a/Makefile.std b/Makefile.std
+index 72d1ba9..39b8935 100644
+--- a/Makefile.std
++++ b/Makefile.std
+@@ -434,9 +434,6 @@ KNR =
+ # don't you have gettimeofday?
+ TIME =
+ # TIME = -DUSETIME
+-# don't you have lockf or flock?
+-LOCK =
+-LOCK = -DUSELOCKFILE
+ 
+ # game defaults, you probably only want to alter the SCORE
+ #
+@@ -488,7 +485,7 @@ COFLAGS = -l
+ RCSFLAGS =
+ 
+ DEFINES = $(EXTRACCOPTIONS) -DFONT_NAME='$(FONT)' $(NDEBUG) \
+-	-DSCORE_DIR='"$(SCORE)"' $(LOCK) $(TIME) $(KNR) -DSCROLLBARBUGFIX
++	-DSCORE_DIR='"$(SCORE)"' $(TIME) $(KNR) -DSCROLLBARBUGFIX
+ LOCAL_LIBRARIES = $(XAWLIB) $(XTOOLLIB) $(XMULIB) $(XLIB) $(MATHSLIB)
+ DEPLIBS = $(DEPXLIB)
+ 
+diff --git a/scoring.c b/scoring.c
+index b63c2b6..015dd43 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -1,36 +1,8 @@
+ /* Copyright (C) 1993, 1992 Nathan Sidwell */
+-/* RCS $Id: scoring.c 1.2 Tue, 16 Mar 1999 11:28:16 +0000 nathan $ */
+-/*{{{  file locking problems*/
+-/*
+- * USELOCKFILE file locking as suggested by
+- * Daniel Edward Lovinger <del+@cmu.edu>
+- * With lockf (or flock), we just use the kernel's locking stuff to lock the
+- * entire score file while we read, or update it. But some distributed
+- * file systems don't support it and some are broken (SunOS 4.1).
+- * USELOCKFILE uses uses open(O_CREAT | O_EXCL) to create
+- * a lock file in the same directory as the xmris high score file, with
+- * the name "xmris.lock".
+- * The personal score files are either in the score file directory
+- * with names "xmris-<name>", or in the user's home directory with name
+- * ".xmris.scores".
+- * In order to work correctly, if xmris is set_euid'd to get the access
+- * permissions to the high score directory, we keep juggling
+- * the effective user id between the set_euid'd one and the real uid.
+- * This ensures that xmris can open the display on servers which use
+- * magic cookie and access control (like openwindows), and that the
+- * personal file has the correct attributes when created in the user's
+- * home directory.
+- *
+- * Some systems have flock (BSD), and some have lockf (SYSV).
+- */
+-/*}}}*/
+ #include "xmris.h"
+ /*{{{  other includes*/
+ #include <pwd.h>
+ #include <sys/stat.h>
+-#ifdef USELOCKFILE
+-#include <fcntl.h>
+-#endif /* USELOCKFILE */
+ /*}}}*/
+ /*{{{  file locking*/
+ #ifndef SYSV
+@@ -53,10 +25,6 @@ static int      personal_make = 2;
+ static uid_t    personal_uid = -1;  /* uid for personal file */
+ static char     date_format[4] = "   ";
+ static char     *alternate = NULL;    /* alternative name */
+-#ifdef USELOCKFILE
+-static char     *locking_file = NULL;  /* lock file name */
+-static unsigned locks;      /* number of locks open */
+-#endif /* USELOCKFILE */
+ static HIGH_SCORE *CONST tables[] =
+   {scoring.high, scoring.today, scoring.personal};
+ /*}}}*/
+@@ -164,54 +132,11 @@ ARGSEP  uid_t     uid
+ {
+   FILE    *stream;
+ 
+-#ifdef USELOCKFILE
+-  if(locking_file && !locks)
+-    /*{{{  attempt exclusive file lock*/
+-    {
+-      unsigned  count;
+-      int       filed;
+-    
+-      for(count = 3; count;)
+-	{
+-	  if(current_uid != effective_uid)
+-	    set_euid((current_uid = effective_uid));
+-	  filed = open(locking_file, O_CREAT | O_EXCL, 0666);
+-	  if(filed >= 0)
+-	    break;
+-	  if(errno == EINTR)
+-	    continue;
+-	  else if(errno == EEXIST)
+-	    {
+-	      sleep(1);
+-	      if(!file_changed(name, uid))
+-		count--;
+-	    }
+-	  else
+-	    {
+-	      perror(locking_file);
+-	      break;
+-	    }
+-	}
+-      if(filed >= 0)
+-	close(filed);
+-    }
+-    /*}}}*/
+-#endif /* USELOCKFILE */
+   if(uid != current_uid)
+     set_euid((current_uid = uid));
+   stream = fopen(name, flag & 1 ? "w+" : "r+");
+   if(!stream && !(flag & 2))
+     perror(name);
+-#ifdef USELOCKFILE
+-  if(stream)
+-    locks++;
+-  else if(locking_file && !locks)
+-    {
+-      if(current_uid != effective_uid)
+-	set_euid((current_uid = effective_uid));
+-      unlink(locking_file);
+-    }
+-#else
+   if(stream)
+     /*{{{  get lock on the file*/
+     while(lock_file(stream))
+@@ -220,7 +145,6 @@ ARGSEP  uid_t     uid
+ 	  continue;
+       }
+     /*}}}*/
+-#endif /* USELOCKFILE */
+   if(stream && flag & 4 && effective_uid == real_uid)
+     chmod(name, 0666); /* not everyone has fchmod */
+   if(current_uid != real_uid)
+@@ -238,22 +162,9 @@ FUNCARG((stream),
+  */
+ {
+   fflush(stream);
+-#ifdef USELOCKFILE
+-  fclose(stream);
+-  locks--;
+-  if(locking_file && locks)
+-    {
+-      if(current_uid != effective_uid)
+-	set_euid((current_uid = effective_uid));
+-      unlink(locking_file);
+-      if(current_uid != real_uid)
+-	set_euid((current_uid = real_uid));
+-    }
+-#else
+   rewind(stream);
+   unlock_file(stream);
+   fclose(stream);
+-#endif /* USELOCKFILE */
+   return;
+ }
+ /*}}}*/
+@@ -394,19 +305,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+   dirlen = data.dir ? strlen(data.dir) : 0;
+   if(dirlen && data.dir[dirlen - 1] == '/')
+     dirlen--;
+-#ifdef USELOCKFILE
+-  /*{{{  lock file?*/
+-  if(dirlen)
+-    {
+-      locking_file = malloc(dirlen + 12);
+-      if(locking_file)
+-	{
+-	  strcpy(locking_file, data.dir);
+-	  strcpy(&locking_file[dirlen], "/xmris.lock");
+-	}
+-    }
+-  /*}}}*/
+-#endif /* USELOCKFILE */
+   /*{{{  score directory?*/
+   if(dirlen)
+     {
+diff --git a/xmris.man b/xmris.man
+index 1e7c47f..fab41d3 100644
+--- a/xmris.man
++++ b/xmris.man
+@@ -866,14 +866,6 @@ file to 666 if creating it.
+ .br
+ .ne 3
+ .TP
+-.B .../xmris.lock
+-In some systems, where lockf or flock doesn't work, this temporary file
+-is used to perform the locking. The directory containing it must be
+-writable by Mr Is. This can be done by chmoding the directory, or
+-by setuiding Mr Is appropriately.
+-.br
+-.ne 4
+-.TP
+ .PD 0
+ .B .../xmris-<name>
+ .TP
+@@ -888,7 +880,7 @@ to move it to the score directory. Mr Is
+ will attempt to create the personal files in the score directory. If this
+ cannot be done, the personal score file is placed in the home directory. In
+ order to create the personal score file in the score directory, Mr Is will
+-have to have the correct access rights, as with the lock file. A setuid Mr Is
++have to have the correct access rights. A setuid Mr Is
+ will juggle the effective uid correctly for accessing both the score directory
+ and the users' home directories.
+ .br
+@@ -923,10 +915,6 @@ Some of the garden files.
+ .BR xmred (6)
+ .SH ERRORS
+ .PP
+-If you use a lock file, rather than lockf, and an error occurs
+-creating the lock file, a message is printed on stderr, and file
+-locking is not done for that access. Subsequent accesses may be alright.
+-.PP
+ If an error occurs opening the score file, a message is printed on
+ stderr, and the score file is disabled. Personal score files will
+ be generated in the users' home directories.
+-- 
+1.7.5
+

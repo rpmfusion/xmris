@@ -1,0 +1,306 @@
+From 1105d6f3df03ffe6f3bd26fc37f8daf092f920e5 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Sun, 1 May 2011 10:59:39 +0200
+Subject: [PATCH 15/20] Open score files only once and keep them open till the
+ program exits
+
+---
+ scoring.c |  151 ++++++++++++++++++++++++++++++-------------------------------
+ xmris.c   |    1 +
+ xmris.h   |    1 +
+ 3 files changed, 76 insertions(+), 77 deletions(-)
+
+diff --git a/scoring.c b/scoring.c
+index 72f08d6..381057b 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -17,10 +17,11 @@
+ #endif /* SYSV */
+ /*}}}*/
+ /*{{{  static*/
+-static CONST char *score_dir = "/var/games";
+ static CONST char date_formats[4] = "DMY";
+-static char     *score_file = NULL;   /* high score file name */
++static char     *score_file = "/var/games/xmris.score"; /* score file name */
+ static char     *personal_file = NULL;  /* personal in home dir */
++static FILE     *score_stream = NULL;
++static FILE     *personal_stream = NULL;
+ static char     date_format[4] = "   ";
+ static char     *alternate = NULL;    /* alternative name */
+ static HIGH_SCORE *CONST tables[] =
+@@ -29,7 +30,7 @@ static HIGH_SCORE *CONST tables[] =
+ /*{{{  prototypes*/
+ static unsigned expire PROTOARG((time_t, time_t));
+ static unsigned file_changed PROTOARG((char CONST *));
+-static FILE *get_lock PROTOARG((char CONST *, unsigned));
++static unsigned get_lock PROTOARG((FILE *));
+ static VOIDFUNC get_unlock PROTOARG((FILE *));
+ static unsigned insert_personal PROTOARG((HIGH_SCORE CONST *));
+ static unsigned insert_score
+@@ -106,33 +107,29 @@ FUNCARG((name),
+   return changed;
+ }
+ /*}}}*/
+-/*{{{  void get_lock(name, flag)*/
+-static FILE *get_lock
+-FUNCARG((name, flag),
+-	char CONST *name
+-ARGSEP  unsigned  flag
++/*{{{  unsigned get_lock(stream)*/
++static unsigned get_lock
++FUNCARG((stream),
++	FILE *stream
+ )
+ /*
+- * open and locks a high score file
+- * flag & 1 == 0 -> "r+"
+- * flag & 1 != 0 -> "w+"
+- * flag & 2 inhibit error message
++ * lock the high score file
+  */
+ {
+-  FILE    *stream;
+-
+-  stream = fopen(name, flag & 1 ? "w+" : "r+");
+-  if(!stream && !(flag & 2))
+-    perror(name);
+-  if(stream)
+     /*{{{  get lock on the file*/
+-    while(lock_file(stream))
++    while(1)
+       {
+-	if(errno == EINTR)
+-	  continue;
++	int res = lock_file(stream);
++	if(res)
++	  {
++	    if(errno == EINTR)
++	      continue;
++	    perror("Error locking score file");
++	  }
++
++	return res == 0;
+       }
+     /*}}}*/
+-  return stream;
+ }
+ /*}}}*/
+ /*{{{  void get_unlock(stream)*/
+@@ -141,14 +138,10 @@ FUNCARG((stream),
+ 	FILE    *stream
+ )
+ /*
+- * unlock and close the high score file
++ * unlock the high score file
+  */
+ {
+-  fflush(stream);
+-  rewind(stream);
+   unlock_file(stream);
+-  fclose(stream);
+-  return;
+ }
+ /*}}}*/
+ /*{{{  void high_score(score, screen, msec)*/
+@@ -186,7 +179,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+   char CONST *user;
+   char CONST *home;
+   char      *reallife;
+-  size_t    dirlen;
+   
+   user = NULL;
+   home = NULL;
+@@ -287,13 +279,12 @@ extern VOIDFUNC init_scores FUNCARGVOID
+   /*}}}*/
+   /*{{{  score directory?*/
+     {
+-      dirlen = strlen(score_dir);
+-      score_file = malloc(dirlen + 14);
+-      if(score_file)
+-	{
+-	  strcpy(score_file, score_dir);
+-	  strcpy(&score_file[dirlen], "/xmris.score");
+-	}
++      score_stream = fopen(score_file, "r+");
++      /* If we cannot open it, try creating it */
++      if(!score_stream)
++	score_stream = fopen(score_file, "w+");
++      if (!score_stream)
++	score_file = NULL;
+     }
+   /*}}}*/
+   /*{{{  personal file*/
+@@ -310,6 +301,15 @@ extern VOIDFUNC init_scores FUNCARGVOID
+ 	  {
+ 	    strcpy(personal_file, home);
+ 	    strcpy(&personal_file[length], "/.xmris.score");
++
++	    personal_stream = fopen(personal_file, "r+");
++	    if(!personal_stream)
++	      personal_stream = fopen(personal_file, "w+");
++	    if(!personal_stream)
++	      {
++		free(personal_file);
++		personal_file = NULL;
++	      }
+ 	  }
+       }
+   }
+@@ -320,6 +320,24 @@ extern VOIDFUNC init_scores FUNCARGVOID
+   return;
+ }
+ /*}}}*/
++/*{{{  void init_scores()*/
++extern VOIDFUNC cleanup_scores FUNCARGVOID
++/*
++ * Close open score files
++ */
++{
++  if(score_stream)
++    {
++      fclose(score_stream);
++      score_stream = NULL;
++    }
++  if(personal_stream)
++    {
++      fclose(personal_stream);
++      personal_stream = NULL;
++    }
++}
++/*}}}*/
+ /*{{{  unsigned insert_personal(sptr)*/
+ static unsigned insert_personal
+ FUNCARG((sptr),
+@@ -407,32 +425,23 @@ FUNCARG((insert),
+  * write the files back
+  */
+ {
+-  FILE      *score_stream;
+-  FILE      *personal_stream;
+-  unsigned  do_score, do_personal;
+-  
+-  score_stream = personal_stream = NULL;
+-  do_score = do_personal = 0;
+-  /*{{{  score_file?*/
+-  if(score_file)
++  unsigned do_score = 0, do_personal = 0;
++  unsigned score_lock = 0, personal_lock = 0;
++
++  if(score_stream)
+     {
+-      score_stream = get_lock(score_file, 2);
+-      if(score_stream)
++      score_lock = get_lock(score_stream);
++      if(score_lock)
+ 	do_score = merge_scores(score_stream);
+-      else
+-	do_score = 1;
+     }
+-  /*}}}*/
+-  /*{{{  personal_file?*/
+-  if(personal_file)
++
++  if(personal_stream)
+     {
+-      personal_stream = get_lock(personal_file, 2);
+-      if(personal_stream)
++      personal_lock = get_lock(personal_stream);
++      if(personal_lock)
+ 	do_personal = merge_personal(personal_stream);
+-      else
+-	do_personal = 1;
+     }
+-  /*}}}*/
++
+   /*{{{  check alternate*/
+   if(alternate)
+     {
+@@ -930,37 +939,23 @@ FUNCARG((insert),
+     }
+   /*}}}*/
+   /*{{{  write_score?*/
+-  if(do_score)
++  if(do_score && score_lock)
+     {
+-      if(!score_stream && score_file)
+-	{
+-	  score_stream = get_lock(score_file, 5);
+-	  if(!score_stream)
+-	    score_file = NULL;
+-	}
+-      if(score_stream)
+-	write_scores(score_stream);
++      write_scores(score_stream);
++      file_changed(score_file);
+     }
+   /*}}}*/
+   /*{{{  write personal?*/
+-  if(do_personal)
++  if(do_personal && personal_lock)
+     {
+-	  if(!personal_stream)
+-	    personal_stream = get_lock(personal_file, 1);
+-	  if(personal_stream)
+-	    write_personal(personal_stream);
+-	  else
+-	    personal_file = NULL;
++      write_personal(personal_stream);
++      file_changed(personal_file);
+     }
+   /*}}}*/
+-  if(personal_stream)
++  if(personal_lock)
+     get_unlock(personal_stream);
+-  if(score_stream)
++  if(score_lock)
+     get_unlock(score_stream);
+-  if(do_score && score_file)
+-    file_changed(score_file);
+-  if(do_personal && personal_file)
+-    file_changed(personal_file);
+   return;
+ }
+ /*}}}*/
+@@ -1218,6 +1213,7 @@ FUNCARG((stream),
+       check = 0;
+     }
+   fprintf(stream, "+%lu\n", check);
++  fflush(stream);
+   return;
+ }
+ /*}}}*/
+@@ -1245,6 +1241,7 @@ FUNCARG((stream),
+       check = 0;
+     }
+   fprintf(stream, "+%lu %s\n", check, date_format);
++  fflush(stream);
+   return;
+ }
+ /*}}}*/
+diff --git a/xmris.c b/xmris.c
+index b1a0404..f10e3f7 100644
+--- a/xmris.c
++++ b/xmris.c
+@@ -1348,6 +1348,7 @@ ARGSEP  char CONST **argv
+       assert(monster.normals < 20);
+     }
+   timer_close();
++  cleanup_scores();
+   return 0;
+ }
+ /*}}}*/
+diff --git a/xmris.h b/xmris.h
+index 1e696c5..34969df 100644
+--- a/xmris.h
++++ b/xmris.h
+@@ -536,6 +536,7 @@ extern unsigned move_player PROTOARG((VOIDARG));
+ extern VOIDFUNC check_scores PROTOARG((VOIDARG));
+ extern VOIDFUNC high_score PROTOARG((unsigned long, unsigned, unsigned long));
+ extern VOIDFUNC init_scores PROTOARG((VOIDARG));
++extern VOIDFUNC cleanup_scores PROTOARG((VOIDARG));
+ /*}}}*/
+ /*{{{  timer*/
+ extern VOIDFUNC timer_close PROTOARG((VOIDARG));
+-- 
+1.7.5
+

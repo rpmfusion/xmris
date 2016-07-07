@@ -1,0 +1,27 @@
+From 3acb9936eb6ec40de5188c47e5a720d375657ba8 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Tue, 30 Nov 2010 15:00:29 +0100
+Subject: [PATCH 06/20] Fix key presses getting lost
+
+Without this patch keypresses get lost when the mouse is outside the window,
+but the keyboard focus is on the window.
+---
+ xmris.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/xmris.c b/xmris.c
+index 22fa1af..2f6cc62 100644
+--- a/xmris.c
++++ b/xmris.c
+@@ -91,6 +91,8 @@ static char CONST garden_translations[] =
+ /*{{{  static char CONST form_translations[] =*/
+ static char CONST form_translations[] =
+ "\
++<KeyPress>:keypress()\n\
++<KeyRelease>:keyrelease()\n\
+ <FocusOut>:pause()\n\
+ ";
+ /*}}}*/
+-- 
+1.7.5
+

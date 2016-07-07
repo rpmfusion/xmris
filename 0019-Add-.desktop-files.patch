@@ -1,0 +1,62 @@
+From e9445fb7ea16fdbcfe7577dfbad3544c90670fe8 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Sun, 1 May 2011 17:14:50 +0200
+Subject: [PATCH 19/20] Add .desktop files
+
+---
+ xmred.desktop |    9 +++++++++
+ xmris.desktop |    9 +++++++++
+ xmsit.desktop |    9 +++++++++
+ 3 files changed, 27 insertions(+), 0 deletions(-)
+ create mode 100644 xmred.desktop
+ create mode 100644 xmris.desktop
+ create mode 100644 xmsit.desktop
+
+diff --git a/xmred.desktop b/xmred.desktop
+new file mode 100644
+index 0000000..e60a49f
+--- /dev/null
++++ b/xmred.desktop
+@@ -0,0 +1,9 @@
++[Desktop Entry]
++Name=X Mr Ed
++Comment=Level Editor for X Mr Is
++Exec=xmred
++Icon=xmris
++Terminal=false
++StartupNotify=false
++Type=Application
++Categories=Game;ArcadeGame;
+diff --git a/xmris.desktop b/xmris.desktop
+new file mode 100644
+index 0000000..6cd97f2
+--- /dev/null
++++ b/xmris.desktop
+@@ -0,0 +1,9 @@
++[Desktop Entry]
++Name=X Mr Is
++Comment=Maze digging and cherry eating game
++Exec=xmris
++Icon=xmris
++Terminal=false
++StartupNotify=false
++Type=Application
++Categories=Game;ArcadeGame;
+diff --git a/xmsit.desktop b/xmsit.desktop
+new file mode 100644
+index 0000000..e14bdef
+--- /dev/null
++++ b/xmsit.desktop
+@@ -0,0 +1,9 @@
++[Desktop Entry]
++Name=X Ms It
++Comment=Maze digging and cherry eating game
++Exec=xmsit
++Icon=xmsit
++Terminal=false
++StartupNotify=false
++Type=Application
++Categories=Game;ArcadeGame;
+-- 
+1.7.5
+

@@ -1,0 +1,98 @@
+From dc28065b144dbfa1da8007b4482f8415894eee43 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Tue, 30 Nov 2010 15:55:00 +0100
+Subject: [PATCH 07/20] Change key binding defaults to something sane
+
+---
+ Xmris-ad.src |    8 ++++----
+ defcom.c     |    8 ++++----
+ xmris.man    |   21 ++++-----------------
+ 3 files changed, 12 insertions(+), 25 deletions(-)
+
+diff --git a/Xmris-ad.src b/Xmris-ad.src
+index fd94b76..60be0ac 100644
+--- a/Xmris-ad.src
++++ b/Xmris-ad.src
+@@ -4,10 +4,10 @@
+ ! These are some of the resources you can fiddle with for xmris
+ ! The defaults are shown in the man page.
+ 
+-*Up:			apostrophe
+-*Down:			slash
+-*Left:			z
+-*Right:			x
++*Up:			Up
++*Down:			Down
++*Left:			Left
++*Right:			Right
+ *Throw:			space
+ *Pause:			p
+ *Quit:			q
+diff --git a/defcom.c b/defcom.c
+index f8a59b5..5934c5e 100644
+--- a/defcom.c
++++ b/defcom.c
+@@ -234,13 +234,13 @@ XtResource resources[] =
+   {"dir", "Dir", XtRString, sizeof(String),
+       XtOffsetOf(DATA, dir), XtRString, (XtPointer)SCORE_DIR},
+   {"up", "Up", XtRKeySym, sizeof(KeySym),
+-      XtOffsetOf(DATA, keysyms[0]), XtRString, (XtPointer)"apostrophe"},
++      XtOffsetOf(DATA, keysyms[0]), XtRString, (XtPointer)"Up"},
+   {"down", "Down", XtRKeySym, sizeof(KeySym),
+-      XtOffsetOf(DATA, keysyms[1]), XtRString, (XtPointer)"slash"},
++      XtOffsetOf(DATA, keysyms[1]), XtRString, (XtPointer)"Down"},
+   {"left", "Left", XtRKeySym, sizeof(KeySym),
+-      XtOffsetOf(DATA, keysyms[2]), XtRString, (XtPointer)"z"},
++      XtOffsetOf(DATA, keysyms[2]), XtRString, (XtPointer)"Left"},
+   {"right", "Right", XtRKeySym, sizeof(KeySym),
+-      XtOffsetOf(DATA, keysyms[3]), XtRString, (XtPointer)"x"},
++      XtOffsetOf(DATA, keysyms[3]), XtRString, (XtPointer)"Right"},
+   {"throw", "Throw", XtRKeySym, sizeof(KeySym),
+       XtOffsetOf(DATA, keysyms[KEY_THROW]), XtRString, (XtPointer)"space"},
+   {"pause", "Pause", XtRKeySym, sizeof(KeySym),
+diff --git a/xmris.man b/xmris.man
+index 0d69f88..1e7c47f 100644
+--- a/xmris.man
++++ b/xmris.man
+@@ -401,14 +401,14 @@ defaults in '[]'.)
+ .br
+ .ne 11
+ .TP
+-.B Xmris.Up: \fIkeysym\fP [apostrophe]
++.B Xmris.Up: \fIkeysym\fP [Up]
+ .PD 0
+ .TP
+-.B Xmris.Down: \fIkeysym\fP [slash]
++.B Xmris.Down: \fIkeysym\fP [Down]
+ .TP
+-.B Xmris.Left: \fIkeysym\fP [z]
++.B Xmris.Left: \fIkeysym\fP [Left]
+ .TP
+-.B Xmris.Right: \fIkeysym\fP [x]
++.B Xmris.Right: \fIkeysym\fP [Right]
+ .TP
+ .B Xmris.Throw: \fIkeysym\fP [space]
+ .TP
+@@ -493,19 +493,6 @@ Set the number of distinct colours allocated from the colour map.
+ .B Xmris.Static: \fI{yes, no}\fP [no]
+ Do not use dynamic background colors.
+ .PP
+-For example, if you want to use the arrow keys, the following will work
+-.br
+-.ne 6
+-.IP
+-Xmris.Up:       Up
+-.br
+-Xmris.Down:     Down
+-.br
+-Xmris.Left:     Left
+-.br
+-Xmris.Right:    Right
+-.br
+-.PP
+ In addition, you have the normal resources such as '*Font'.
+ .PP
+ Normally the cursor is invisible in the Mr Is window. You can force
+-- 
+1.7.5
+

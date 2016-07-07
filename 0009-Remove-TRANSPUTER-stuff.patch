@@ -1,0 +1,518 @@
+From 361a5e7c3ebfbbe7fecbdbdd9d5f7497679f3be1 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Fri, 29 Apr 2011 17:17:12 +0200
+Subject: [PATCH 09/20] Remove TRANSPUTER stuff
+
+This is not used (never defined by any makefiles) and obfuscates the code
+needlessly. Removing this is a preparation step for cleaning up the highscore
+support for dropping setgid rights directly on start, rather then using
+unsafe seteg/uid tricks.
+---
+ common.h  |    4 ---
+ defcom.c  |    6 -----
+ scoring.c |   49 ------------------------------------------
+ scram.c   |    4 ---
+ timer.c   |   71 -------------------------------------------------------------
+ xmris.c   |    2 -
+ xmris.h   |   11 ---------
+ 7 files changed, 0 insertions(+), 147 deletions(-)
+
+diff --git a/common.h b/common.h
+index e1fd8dd..0babbce 100644
+--- a/common.h
++++ b/common.h
+@@ -16,9 +16,7 @@
+ #include <errno.h>
+ #include <ctype.h>
+ #include <time.h>
+-#ifndef TRANSPUTER
+ #include <unistd.h>
+-#endif /* TRANSPUTER */
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+ #include <X11/keysym.h>
+@@ -294,9 +292,7 @@ typedef struct Data
+   Boolean username; /* use username of user */
+   Boolean nodynamic; /* don't take advantage of dynamic visuals */
+   Boolean nodisplay; /* don't open the display, even to get X resources */
+-#ifndef TRANSPUTER
+   Boolean busywait; /* do busy waiting */
+-#endif /* TRANSPUTER */
+ #endif /* XMRED */
+   Boolean gender;   /* he or she? */
+   int     distinct; /* distinct colors allocated */
+diff --git a/defcom.c b/defcom.c
+index 5934c5e..9715fe9 100644
+--- a/defcom.c
++++ b/defcom.c
+@@ -219,9 +219,7 @@ XrmOptionDescRec options[] =
+   {"-username",".username",     XrmoptionNoArg, (XtPointer)XtEyes},
+   {"-realname",".username",     XrmoptionNoArg, (XtPointer)XtEno},
+   {"-static",  ".static",       XrmoptionNoArg, (XtPointer)XtEyes},
+-#ifndef TRANSPUTER
+   {"-busywait", ".busywait",    XrmoptionNoArg, (XtPointer)XtEyes},
+-#endif /* TRANSPUTER */
+ #endif /* XMRED */
+   {NULL}
+ };
+@@ -259,10 +257,8 @@ XtResource resources[] =
+       XtOffsetOf(DATA, username), XtRImmediate, (XtPointer)False},
+   {"static", "Static", XtRBoolean, sizeof(Boolean),
+       XtOffsetOf(DATA, nodynamic), XtRImmediate, (XtPointer)False},
+-#ifndef TRANSPUTER
+   {"busywait", "Busywait", XtRBoolean, sizeof(Boolean),
+       XtOffsetOf(DATA, busywait), XtRImmediate, (XtPointer)False},
+-#endif /* TRANSPUTER */
+ #endif /* XMRED */
+   {XtNfont, XtCFont, XtRFont, sizeof(Font),
+       XtOffsetOf(DATA, font), XtRString, (XtPointer)FONT_NAME},
+@@ -394,9 +390,7 @@ HELP CONST help[] =
+   {"Remove user's scores",          "-remove",    "", "<name>"},
+   {"Do not open display",           "+display", "", ""},
+   {"Store date format change",      "-format",    "", ""},
+-#ifndef TRANSPUTER
+   {"Force busywaiting",             "-busywait",  "Busywait:yes", ""},
+-#endif /* TRANSPUTER */
+ #endif /* XMRED */
+   {NULL}
+ };
+diff --git a/scoring.c b/scoring.c
+index 6f1030f..b63c2b6 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -26,15 +26,11 @@
+ /*}}}*/
+ #include "xmris.h"
+ /*{{{  other includes*/
+-#ifdef TRANSPUTER
+-#include <iocntrl.h>
+-#else
+ #include <pwd.h>
+ #include <sys/stat.h>
+ #ifdef USELOCKFILE
+ #include <fcntl.h>
+ #endif /* USELOCKFILE */
+-#endif /* TRANSPUTER */
+ /*}}}*/
+ /*{{{  file locking*/
+ #ifndef SYSV
+@@ -131,9 +127,6 @@ ARGSEP  uid_t       uid
+  * so that we pick up the new scores
+  */
+ {
+-#ifdef TRANSPUTER
+-  return 1; /* assume that it has changed */
+-#else
+   static  time_t last_time[2];
+   struct stat buffer;
+   unsigned  changed;
+@@ -151,7 +144,6 @@ ARGSEP  uid_t       uid
+   if(real_uid != current_uid)
+     set_euid((current_uid = real_uid));
+   return changed;
+-#endif /* TRANSPUTER */
+ }
+ /*}}}*/
+ /*{{{  void get_lock(name, flag, uid)*/
+@@ -172,34 +164,6 @@ ARGSEP  uid_t     uid
+ {
+   FILE    *stream;
+ 
+-#ifdef TRANSPUTER
+-  if(locking_file && !locks)
+-    /*{{{  attempt file lock*/
+-    {
+-      unsigned  count;
+-      FILE      *lock;
+-    
+-      for(count = 3; count; count--)
+-	{
+-	  lock = fopen(locking_file, "r");
+-	  if(lock)
+-	    {
+-	      fclose(lock);
+-	      sleep(1);
+-	    }
+-	  else
+-	    {
+-	      lock = fopen(locking_file, "w");
+-	      if(lock)
+-		fclose(lock);
+-	      else
+-		perror(locking_file);
+-	      break;
+-	    }
+-	}
+-    }
+-    /*}}}*/
+-#else
+ #ifdef USELOCKFILE
+   if(locking_file && !locks)
+     /*{{{  attempt exclusive file lock*/
+@@ -235,7 +199,6 @@ ARGSEP  uid_t     uid
+ #endif /* USELOCKFILE */
+   if(uid != current_uid)
+     set_euid((current_uid = uid));
+-#endif /* TRANSPUTER */
+   stream = fopen(name, flag & 1 ? "w+" : "r+");
+   if(!stream && !(flag & 2))
+     perror(name);
+@@ -244,10 +207,8 @@ ARGSEP  uid_t     uid
+     locks++;
+   else if(locking_file && !locks)
+     {
+-#ifndef TRANSPUTER
+       if(current_uid != effective_uid)
+ 	set_euid((current_uid = effective_uid));
+-#endif /* TRANSPUTER */
+       unlink(locking_file);
+     }
+ #else
+@@ -260,12 +221,10 @@ ARGSEP  uid_t     uid
+       }
+     /*}}}*/
+ #endif /* USELOCKFILE */
+-#ifndef TRANSPUTER
+   if(stream && flag & 4 && effective_uid == real_uid)
+     chmod(name, 0666); /* not everyone has fchmod */
+   if(current_uid != real_uid)
+     set_euid((current_uid = real_uid));
+-#endif /* TRANSPUTER */
+   return stream;
+ }
+ /*}}}*/
+@@ -284,15 +243,11 @@ FUNCARG((stream),
+   locks--;
+   if(locking_file && locks)
+     {
+-#ifndef TRANSPUTER
+       if(current_uid != effective_uid)
+ 	set_euid((current_uid = effective_uid));
+-#endif
+       unlink(locking_file);
+-#ifndef TRANSPUTER
+       if(current_uid != real_uid)
+ 	set_euid((current_uid = real_uid));
+-#endif /* TRANSPUTER */
+     }
+ #else
+   rewind(stream);
+@@ -342,7 +297,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+   user = NULL;
+   home = NULL;
+   reallife = NULL;
+-#ifndef TRANSPUTER
+   /*{{{  read passwd information*/
+   {
+     struct passwd *ptr;
+@@ -409,7 +363,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+       }
+   }
+   /*}}}*/
+-#endif
+   scoring.mine.score = 0;
+   /*{{{  set username*/
+   {
+@@ -720,7 +673,6 @@ FUNCARG((insert),
+ 	  
+ 	  personal = 0;
+ 	  truename = home = NULL;
+-#ifndef TRANSPUTER
+ 	  /*{{{  find name & home*/
+ 	  {
+ 	    struct passwd *ptr;
+@@ -733,7 +685,6 @@ FUNCARG((insert),
+ 	      }
+ 	  }
+ 	  /*}}}*/
+-#endif /* TRANSPUTER */
+ 	  /*{{{  search*/
+ 	  for(found = index = 0; index != 2; index++)
+ 	    {
+diff --git a/scram.c b/scram.c
+index 7d34d33..d68cf03 100644
+--- a/scram.c
++++ b/scram.c
+@@ -25,11 +25,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <ctype.h>
+-#ifdef TRANSPUTER
+-#include <iocntrl.h>
+-#else
+ #include <unistd.h>
+-#endif /* TRANSPUTER */
+ /*}}}*/
+ #define SUFFIXMONO  ".bw"
+ #define SUFFIXCOLOR ".rgb"
+diff --git a/timer.c b/timer.c
+index c8fa2c1..028f8f0 100644
+--- a/timer.c
++++ b/timer.c
+@@ -54,12 +54,8 @@
+  */
+ /*}}}*/
+ #include "xmris.h"
+-#ifdef TRANSPUTER
+-#include <process.h>
+-#else
+ #include <sys/time.h>
+ #include <signal.h>
+-#endif
+ #ifdef SVR4
+ #ifndef SYSV
+ #define SYSV
+@@ -74,7 +70,6 @@
+  *    reblocks the signal
+  * signal_release returns the block mask to what it was before signal_hold
+  */
+-#ifndef TRANSPUTER
+ #if defined POSIX || defined linux
+ #  define MASK sigset_t
+ #  define signal_hold(signal, maskp) \
+@@ -125,7 +120,6 @@
+ #    endif /* SYSV */
+ #  endif /* __hpux */
+ #endif /* POSIX */
+-#endif /* TRANSPUTER */
+ /*}}}*/
+ /*{{{  get current time*/
+ /* TICKTIME specifies how many microseconds in each timer tick
+@@ -133,14 +127,6 @@
+  * BUSYWAIT is set if the timer is precise enough for busywait code
+  * to work
+  */
+-#ifdef TRANSPUTER
+-# define gettick(ptr) (*(ptr) = ProcTime())
+-# define TICKTIME (unsigned long)64
+-# define tickdelta(later, earlier) ProcTimeMinus(later, earlier)
+-# define tickafter(later, earlier) ProcTimerAfter(later, earlier)
+-# define tickadd(time, interval) ProcTimePlus(time, interval)
+-  typedef int tick_t;
+-#else
+ # ifdef USETIME
+ #   define gettick(ptr) (*(ptr) = time((time_t *)NULL))
+ #   define TICKTIME (unsigned long)1000000
+@@ -181,17 +167,12 @@
+       (tickdelta(later, earlier) < ~(~(unsigned long)0 >> 1))
+     typedef unsigned long tick_t;
+ # endif /* USETIME */
+-#endif /* TRANSPUTER */
+ /*}}}*/
+ /*{{{  timer*/
+ static struct
+ {
+   VOIDFUNC  (*handler) PROTOARG((int));   /* original handler */
+   unsigned  long usec;              /* interval time in usec */
+-#ifdef TRANSPUTER
+-  tick_t    delay;                  /* tickdelay waiting */
+-  tick_t    timeout;                /* when the next one should timeout */
+-#else
+   struct itimerval interval;        /* internal interval time */
+   unsigned  VOLATILE elapsed;       /* timer elapsed */
+   unsigned  VOLATILE waiting;       /* waiting for the interrupt */
+@@ -201,7 +182,6 @@ static struct
+   tick_t    timeout;                /* timeout */
+   tick_t    delay;                  /* interval delay */
+ #endif /* BUSYWAIT */
+-#endif /* TRANSPUTER */
+   unsigned  state;          /* timing state */
+   tick_t    game;           /* start of game tick */
+   tick_t    start;          /* timing start */
+@@ -226,26 +206,11 @@ static unsigned next;
+ /*}}}*/
+ #endif
+ /*{{{  prototypes*/
+-#ifndef TRANSPUTER
+ static VOIDFUNC timer_alarm PROTOARG((int));
+-#endif /* TRANSPUTER */
+ #ifndef NDEBUG
+ static VOIDFUNC timer_debug PROTOARG((char CONST *));
+ #endif
+ /*}}}*/
+-#ifdef TRANSPUTER
+-/*{{{  void sleep(delay)*/
+-extern VOIDFUNC sleep
+-FUNCARG((delay),
+-	unsigned  delay
+-)
+-{
+-  ProcWait((int)(delay * (1000000 / TICKTIME)));
+-  return;
+-}
+-/*}}}*/
+-#endif /* TRANSPUTER */
+-#ifndef TRANSPUTER
+ /*{{{  void timer_alarm(sig)*/
+ static VOIDFUNC timer_alarm
+ /* ARGSUSED */
+@@ -297,14 +262,12 @@ FUNCARG((sig),
+   return;
+ }
+ /*}}}*/
+-#endif /* TRANSPUTER */
+ /*{{{  void timer_close()*/
+ extern VOIDFUNC timer_close FUNCARGVOID
+ /*
+  * closes the timer stuff
+  */
+ {
+-#ifndef TRANSPUTER
+   if(data.busywait == False)
+     {
+       MASK      mask;
+@@ -322,7 +285,6 @@ extern VOIDFUNC timer_close FUNCARGVOID
+       signal(SIGALRM, timer.handler);
+ #endif /* USESIGSET */
+     }
+-#endif /* TRANSPUTER */
+   return;
+ }
+ /*}}}*/
+@@ -354,10 +316,6 @@ extern VOIDFUNC timer_open FUNCARGVOID
+  * and starting the first tick
+  */
+ {
+-#ifdef TRANSPUTER
+-  assert(ProcGetPriority());
+-  gettick(&timer.timeout);
+-#else
+   if(data.busywait != False)
+ # ifdef BUSYWAIT
+     {
+@@ -382,7 +340,6 @@ extern VOIDFUNC timer_open FUNCARGVOID
+ #endif /* USESIGSET */
+   timer.waiting = 0;
+   timer.elapsed = 1;
+-#endif /* TRANSPUTER */
+ #ifndef NDEBUG
+   timer_debug("Init");
+ #endif
+@@ -418,14 +375,10 @@ ARGSEP  unsigned  state
+ 	assert(t1 || t2);
+       }
+       timer.usec = tick;
+-#ifdef TRANSPUTER
+-      timer.delay = (tick_t)(tick / TICKTIME);
+-#else
+ #ifdef BUSYWAIT
+       timer.delay = (tick_t)(tick / TICKTIME);
+ #endif /* BUSYWAIT */
+       timer.interval.it_value.tv_usec = tick;
+-#endif /* TRASNPUTER */
+     }
+   value = timer.state;
+   switch(state)
+@@ -501,27 +454,6 @@ extern VOIDFUNC timer_wait FUNCARGVOID
+ {
+   int       point;
+   
+-#ifdef TRANSPUTER
+-  /*{{{  wait for it*/
+-  {
+-    tick_t    now;
+-    
+-    gettick(&now);
+-    if(timeafter(now, timer.timeout))
+-      {
+-	point = 1;
+-	timer.timeout = now;
+-	timer.missed++;
+-      }
+-    else
+-      {
+-	point = -1;
+-	ProcAfter(timer.timeout);
+-      }
+-    timer.timeout = tickadd(timer.timeout, timer.delay);
+-  }
+-  /*}}}*/
+-#else
+   {
+     MASK      mask;
+     
+@@ -585,7 +517,6 @@ extern VOIDFUNC timer_wait FUNCARGVOID
+     }
+   /*}}}*/
+ #endif /* BUSYWAIT */
+-#endif /* TRANSPUTER */
+   if(timer.state != TIMING_ON)
+     /* EMPTY */;
+   else if(!timer.count)
+@@ -603,7 +534,6 @@ extern VOIDFUNC timer_wait FUNCARGVOID
+       usec = (unsigned long)tickdelta(timer.stop, timer.start) * TICKTIME;
+       dilation = (unsigned)(usec / FRAME_RATIO_UPDATE *
+ 	  FRAME_SCALE / timer.usec);
+-#ifndef TRANSPUTER
+ #ifdef BUSYWAIT
+       if(!timer.busywait && dilation * 100 < FRAME_SCALE * 97)
+ 	{
+@@ -613,7 +543,6 @@ extern VOIDFUNC timer_wait FUNCARGVOID
+ 	  timer.busywait = 1;
+ 	}
+ #endif /* BUSYWAIT */
+-#endif /* TRANSPUTER */
+       if(dilation <= FRAME_SCALE)
+ 	dilation = FRAME_SCALE;
+       else if(timer.missed <= (global.dilation == FRAME_SCALE ?
+diff --git a/xmris.c b/xmris.c
+index 2f6cc62..d79815a 100644
+--- a/xmris.c
++++ b/xmris.c
+@@ -1260,13 +1260,11 @@ ARGSEP  char CONST **argv
+   Atom wm_delete_window;
+   
+   myname = *argv ? *argv : "Xmris";
+-#ifndef TRANSPUTER
+   real_uid = getuid();
+   effective_uid = geteuid();
+   if(real_uid != effective_uid)
+     set_euid(real_uid);
+   current_uid = real_uid;
+-#endif /* TRANSPUTER */
+   open_toolkit(argc, (String *)argv);
+   init_scores();
+   /*{{{  help?*/
+diff --git a/xmris.h b/xmris.h
+index ac4fd50..9918502 100644
+--- a/xmris.h
++++ b/xmris.h
+@@ -13,25 +13,17 @@
+ #define FUNCANIMATE(name, arg) PROTOVOID(*name(arg)) PROTOVOID(*arg);
+ #endif
+ /*}}}*/
+-#ifdef TRANSPUTER
+-#undef USELOCKFILE
+-#define USELOCKFILE
+-#endif /* TRANSPUTER */
+ /*{{{  check score*/
+ #ifndef SCORE_DIR
+   #error No default score directory
+ #endif /* SCORE_DIR */
+ /*}}}*/
+ /*{{{  set_euid*/
+-#ifdef TRANSPUTER
+-typedef int uid_t;
+-#else
+ #ifdef __hpux
+ #define set_euid(euid) setresuid((uid_t)-1, euid, (uid_t)-1)
+ #else
+ #define set_euid(euid) seteuid(euid)
+ #endif /* __hpux */
+-#endif /* TRANSPUTER */
+ /*}}}*/
+ /*{{{  defines*/
+ /*{{{  board sizes*/
+@@ -564,9 +556,6 @@ extern VOIDFUNC high_score PROTOARG((unsigned long, unsigned, unsigned long));
+ extern VOIDFUNC init_scores PROTOARG((VOIDARG));
+ /*}}}*/
+ /*{{{  timer*/
+-#ifdef TRANSPUTER
+-extern VOIDFUNC sleep PROTOARG((unsigned));
+-#endif /* TRANSPUTER */
+ extern VOIDFUNC timer_close PROTOARG((VOIDARG));
+ extern VOIDFUNC timer_open PROTOARG((VOIDARG));
+ extern unsigned timer_set PROTOARG((unsigned long, unsigned));
+-- 
+1.7.5
+

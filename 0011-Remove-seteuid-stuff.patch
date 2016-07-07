@@ -1,0 +1,329 @@
+From da2715a3b82134d118b032a1db06881d128b564b Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Fri, 29 Apr 2011 17:52:33 +0200
+Subject: [PATCH 11/20] Remove seteuid stuff
+
+Removing this is a preparation step for cleaning up the highscore
+support for dropping setgid rights directly on start, rather then using
+unsafe seteg/uid tricks.
+---
+ scoring.c |   60 ++++++++++++++++++++++--------------------------------------
+ xmris.c   |    5 -----
+ xmris.h   |   10 ----------
+ xmris.man |   19 +++++--------------
+ 4 files changed, 27 insertions(+), 67 deletions(-)
+
+diff --git a/scoring.c b/scoring.c
+index 015dd43..ede2f07 100644
+--- a/scoring.c
++++ b/scoring.c
+@@ -22,7 +22,6 @@ static char     *score_file = NULL;   /* high score file name */
+ static char     *personal_file = NULL;  /* personal in high score dir */
+ static char     *personal_home = NULL;  /* personal in home dir */
+ static int      personal_make = 2;
+-static uid_t    personal_uid = -1;  /* uid for personal file */
+ static char     date_format[4] = "   ";
+ static char     *alternate = NULL;    /* alternative name */
+ static HIGH_SCORE *CONST tables[] =
+@@ -30,8 +29,8 @@ static HIGH_SCORE *CONST tables[] =
+ /*}}}*/
+ /*{{{  prototypes*/
+ static unsigned expire PROTOARG((time_t, time_t));
+-static unsigned file_changed PROTOARG((char CONST *, uid_t));
+-static FILE *get_lock PROTOARG((char CONST *, unsigned, uid_t));
++static unsigned file_changed PROTOARG((char CONST *));
++static FILE *get_lock PROTOARG((char CONST *, unsigned));
+ static VOIDFUNC get_unlock PROTOARG((FILE *));
+ static unsigned insert_personal PROTOARG((HIGH_SCORE CONST *));
+ static unsigned insert_score
+@@ -53,9 +52,9 @@ static unsigned long write_table
+ extern VOIDFUNC check_scores FUNCARGVOID
+ {
+   retire_scores();
+-  if((score_file && file_changed(score_file, effective_uid)) ||
++  if((score_file && file_changed(score_file)) ||
+       (!personal_make && personal_file &&
+-      file_changed(personal_file, personal_uid)))
++      file_changed(personal_file)))
+     load_check_expire_insert(0);
+   return;
+ }
+@@ -84,11 +83,10 @@ ARGSEP  time_t    then
+       then_hour >= 21 && now_hour < 12));
+ }
+ /*}}}*/
+-/*{{{  void file_changed(name, uid)*/
++/*{{{  void file_changed(name)*/
+ static unsigned file_changed
+-FUNCARG((name, uid),
++FUNCARG((name),
+ 	char CONST *name
+-ARGSEP  uid_t       uid
+ )
+ /*
+  * check if a score file has been changed since last I looked,
+@@ -100,8 +98,6 @@ ARGSEP  uid_t       uid
+   unsigned  changed;
+   
+   assert(name);
+-  if(uid != current_uid)
+-    set_euid((current_uid = uid));
+   if(!stat(name, &buffer))
+     {
+       changed = buffer.st_mtime != last_time[name == score_file];
+@@ -109,31 +105,24 @@ ARGSEP  uid_t       uid
+     }
+   else
+     changed = 0;
+-  if(real_uid != current_uid)
+-    set_euid((current_uid = real_uid));
+   return changed;
+ }
+ /*}}}*/
+-/*{{{  void get_lock(name, flag, uid)*/
++/*{{{  void get_lock(name, flag)*/
+ static FILE *get_lock
+-FUNCARG((name, flag, uid),
++FUNCARG((name, flag),
+ 	char CONST *name
+ ARGSEP  unsigned  flag
+-ARGSEP  uid_t     uid
+ )
+ /*
+  * open and locks a high score file
+  * flag & 1 == 0 -> "r+"
+  * flag & 1 != 0 -> "w+"
+  * flag & 2 inhibit error message
+- * flag & 4 && effective_uid == real_uid set chmod 666
+- * uid required to access
+  */
+ {
+   FILE    *stream;
+ 
+-  if(uid != current_uid)
+-    set_euid((current_uid = uid));
+   stream = fopen(name, flag & 1 ? "w+" : "r+");
+   if(!stream && !(flag & 2))
+     perror(name);
+@@ -145,10 +134,6 @@ ARGSEP  uid_t     uid
+ 	  continue;
+       }
+     /*}}}*/
+-  if(stream && flag & 4 && effective_uid == real_uid)
+-    chmod(name, 0666); /* not everyone has fchmod */
+-  if(current_uid != real_uid)
+-    set_euid((current_uid = real_uid));
+   return stream;
+ }
+ /*}}}*/
+@@ -212,7 +197,7 @@ extern VOIDFUNC init_scores FUNCARGVOID
+   {
+     struct passwd *ptr;
+     
+-    ptr = getpwuid(real_uid);
++    ptr = getpwuid(getuid());
+     if(ptr)
+       {
+ 	user = ptr->pw_name;
+@@ -344,7 +329,6 @@ extern VOIDFUNC init_scores FUNCARGVOID
+       }
+   }
+   /*}}}*/
+-  personal_uid = effective_uid;
+   if(data.expire || data.format || data.remove)
+     data.scores = True;
+   load_check_expire_insert(0);
+@@ -448,7 +432,7 @@ FUNCARG((insert),
+   /*{{{  score_file?*/
+   if(score_file)
+     {
+-      score_stream = get_lock(score_file, 2, effective_uid);
++      score_stream = get_lock(score_file, 2);
+       if(score_stream)
+ 	do_score = merge_scores(score_stream);
+       else
+@@ -458,7 +442,7 @@ FUNCARG((insert),
+   /*{{{  personal_file?*/
+   if(personal_file)
+     {
+-      personal_stream = get_lock(personal_file, personal_make, personal_uid);
++      personal_stream = get_lock(personal_file, personal_make);
+       if(personal_stream)
+ 	{
+ 	  personal_make = 0;
+@@ -473,7 +457,7 @@ FUNCARG((insert),
+   /*{{{  personal_home?*/
+   if(personal_home)
+     {
+-      home_stream = get_lock(personal_home, 2, real_uid);
++      home_stream = get_lock(personal_home, 2);
+       if(home_stream)
+ 	{
+ 	  merge_personal(home_stream);
+@@ -482,7 +466,6 @@ FUNCARG((insert),
+ 	      personal_file = personal_home;
+ 	      personal_home = NULL;
+ 	      personal_make = 0;
+-	      personal_uid = real_uid;
+ 	    }
+ 	  else
+ 	    do_personal = 1;
+@@ -534,10 +517,12 @@ FUNCARG((insert),
+   }
+   /*}}}*/
+   /* expire person? */
+-  if(effective_uid != real_uid)
++  if(getuid() != 0)
+     {
+-      if(data.remove || data.format)
+-	fprintf(stderr, "Not owner");
++      if(data.remove)
++	fprintf(stderr, "Removing a person can only be done by root");
++      if(data.format)
++	fprintf(stderr, "Changing the date format can only be done by root");
+       data.remove = data.format = NULL;
+     }
+   else
+@@ -1010,7 +995,7 @@ FUNCARG((insert),
+     {
+       if(!score_stream && score_file)
+ 	{
+-	  score_stream = get_lock(score_file, 5, effective_uid);
++	  score_stream = get_lock(score_file, 5);
+ 	  if(!score_stream)
+ 	    score_file = NULL;
+ 	}
+@@ -1022,7 +1007,7 @@ FUNCARG((insert),
+   if(do_personal)
+     {
+       if(!personal_stream && score_stream && personal_file)
+-	personal_stream = get_lock(personal_file, 3, personal_uid);
++	personal_stream = get_lock(personal_file, 3);
+       if(personal_stream)
+ 	{
+ 	  write_personal(personal_stream);
+@@ -1033,12 +1018,11 @@ FUNCARG((insert),
+       else
+ 	{
+ 	  if(!home_stream)
+-	    home_stream = get_lock(personal_home, 1, real_uid);
++	    home_stream = get_lock(personal_home, 1);
+ 	  if(home_stream)
+ 	    write_personal(home_stream);
+ 	  else
+ 	    personal_home = NULL;
+-	  personal_uid = real_uid;
+ 	  personal_file = personal_home;
+ 	  personal_home = NULL;
+ 	}
+@@ -1052,9 +1036,9 @@ FUNCARG((insert),
+   if(score_stream)
+     get_unlock(score_stream);
+   if(do_score && score_file)
+-    file_changed(score_file, effective_uid);
++    file_changed(score_file);
+   if(do_personal && personal_file)
+-    file_changed(personal_file, personal_uid);
++    file_changed(personal_file);
+   return;
+ }
+ /*}}}*/
+diff --git a/xmris.c b/xmris.c
+index d79815a..b1a0404 100644
+--- a/xmris.c
++++ b/xmris.c
+@@ -1260,11 +1260,6 @@ ARGSEP  char CONST **argv
+   Atom wm_delete_window;
+   
+   myname = *argv ? *argv : "Xmris";
+-  real_uid = getuid();
+-  effective_uid = geteuid();
+-  if(real_uid != effective_uid)
+-    set_euid(real_uid);
+-  current_uid = real_uid;
+   open_toolkit(argc, (String *)argv);
+   init_scores();
+   /*{{{  help?*/
+diff --git a/xmris.h b/xmris.h
+index 9918502..1802e87 100644
+--- a/xmris.h
++++ b/xmris.h
+@@ -18,13 +18,6 @@
+   #error No default score directory
+ #endif /* SCORE_DIR */
+ /*}}}*/
+-/*{{{  set_euid*/
+-#ifdef __hpux
+-#define set_euid(euid) setresuid((uid_t)-1, euid, (uid_t)-1)
+-#else
+-#define set_euid(euid) seteuid(euid)
+-#endif /* __hpux */
+-/*}}}*/
+ /*{{{  defines*/
+ /*{{{  board sizes*/
+ #define KNOCK_THROUGH /* how far we go to knock through a new cell */\
+@@ -355,9 +348,6 @@ EXTERN struct
+   unsigned  pressed;    /* keys we had pressed */
+ } player;
+ /*}}}*/
+-EXTERN uid_t real_uid;          /* who I really am */
+-EXTERN uid_t effective_uid;     /* who I'm pretending to be */
+-EXTERN uid_t current_uid;       /* who I currently am */
+ EXTERN CELL garden[(CELLS_DOWN + CELL_TOP * 2) * CELL_STRIDE];
+ /*{{{  global*/
+ EXTERN struct
+diff --git a/xmris.man b/xmris.man
+index fab41d3..3fe5028 100644
+--- a/xmris.man
++++ b/xmris.man
+@@ -277,13 +277,9 @@ to use the -dir option too.
+ .ne 3
+ .TP
+ .B \-remove \fIname\fP
+-Allows the game's owner to remove someone's scores. The option will only
+-work when the real and effective user ids are the same. (ie
+-a setuid Mr Is has been run by its owner). After updating the files,
++Allows root to remove someone's scores. After updating the files,
+ the score tables are listed, and the game does not start. An X display
+-will still need to be opened, to read the X resources, which may override
+-the default score directory. The +display option may be used to prevent
+-this.
++will still be opened. The +display option may be used to prevent this.
+ .br
+ .ne 3
+ .TP
+@@ -324,7 +320,7 @@ and a warning is given. The following are valid unambiguous dates, '11jun93'
+ .ne 3
+ .TP
+ .B \-format \fIformat\fP
+-Allows the game's owner to set the date format which is stored with the
++Allows root to set the date format which is stored with the
+ score file, for future use disambiguating dates. The format is
+ automatically stored if none is set. The format must be a three character
+ string containing one each of 'D', 'M' and 'Y'.
+@@ -859,10 +855,7 @@ following names.
+ The high score file. The directory is system dependent, and may be
+ changed by application resource or option.
+ This file must either exist and be writable to by Mr Is, or the
+-directory containing it must be writable by Mr Is. This
+-can be done by chmoding the score file or directory, or by
+-setuiding Mr Is appropriately. A non-setuid Mr Is will chmod the score
+-file to 666 if creating it.
++directory containing it must be writable by Mr Is.
+ .br
+ .ne 3
+ .TP
+@@ -880,9 +873,7 @@ to move it to the score directory. Mr Is
+ will attempt to create the personal files in the score directory. If this
+ cannot be done, the personal score file is placed in the home directory. In
+ order to create the personal score file in the score directory, Mr Is will
+-have to have the correct access rights. A setuid Mr Is
+-will juggle the effective uid correctly for accessing both the score directory
+-and the users' home directories.
++have to have the correct access rights.
+ .br
+ .ne 5
+ .TP
+-- 
+1.7.5
+

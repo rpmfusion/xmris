@@ -1,0 +1,26 @@
+From ce1204bfff0c925002033206659c755ab589adb4 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Mon, 2 May 2011 12:00:32 +0200
+Subject: [PATCH 18/20] Install manpages into section 6 rather then 1
+
+---
+ Imakefile |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/Imakefile b/Imakefile
+index 31c8550..b999fda 100644
+--- a/Imakefile
++++ b/Imakefile
+@@ -90,7 +90,8 @@ OWNER =
+ INSTMRISFLAGS = $(OWNER) $(INSTGIDFLAGS)
+ XCOMM normal install locations
+ THEBINDIR = $(BINDIR)
+-THEMANDIR = $(MANDIR)
++THEMANDIR = $(MANSOURCEPATH)6
++MANSUFFIX = 6
+ XCOMM INSTMRISFLAGS = $(INSTPGMFLAGS)
+ XCOMM If you're not installing in the default locations
+ XCOMM DESTDIR = 
+-- 
+1.7.5
+
