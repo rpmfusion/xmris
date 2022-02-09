@@ -1,6 +1,6 @@
 Name:           xmris
 Version:        4.0.5
-Release:        16%{?dist}
+Release:        17%{?dist}
 Summary:        Maze digging and cherry eating game
 Group:          Amusements/Games
 License:        GPL+
@@ -134,6 +134,9 @@ gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 
 
 %changelog
+* Wed Feb 09 2022 RPM Fusion Release Engineering <sergiomb@rpmfusion.org> - 4.0.5-17
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
+
 * Tue Aug 03 2021 RPM Fusion Release Engineering <leigh123linux@gmail.com> - 4.0.5-16
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_35_Mass_Rebuild
 
