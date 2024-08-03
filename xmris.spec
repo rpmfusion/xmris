@@ -19,7 +19,7 @@ Patch6:         0006-Fix-key-presses-getting-lost.patch
 Patch7:         0007-Change-key-binding-defaults-to-something-sane.patch
 Patch8:         0008-Fix-compiler-warnings.patch
 # Patches for safe global highscore handling
-Patch9:        0009-Remove-TRANSPUTER-stuff.patch
+Patch9:         0009-Remove-TRANSPUTER-stuff.patch
 Patch10:        0010-Remove-USELOCKFILE-stuff.patch
 Patch11:        0011-Remove-seteuid-stuff.patch
 Patch12:        0012-Drop-dir-option.patch
@@ -57,25 +57,25 @@ A level editor for %{name}.
 
 %prep
 %setup -q -n %{name}.%{version}
-%patch1 -p1
-%patch2 -p1
-%patch3 -p1
-%patch4 -p1
-%patch5 -p1
-%patch6 -p1
-%patch7 -p1
-%patch8 -p1
-%patch9 -p1
-%patch10 -p1
-%patch11 -p1
-%patch12 -p1
-%patch13 -p1
-%patch14 -p1
-%patch15 -p1
-%patch16 -p1
-%patch17 -p1
-%patch18 -p1
-%patch19 -p1
+%patch -P1 -p1
+%patch -P2 -p1
+%patch -P3 -p1
+%patch -P4 -p1
+%patch -P5 -p1
+%patch -P6 -p1
+%patch -P7 -p1
+%patch -P8 -p1
+%patch -P9 -p1
+%patch -P10 -p1
+%patch -P11 -p1
+%patch -P12 -p1
+%patch -P13 -p1
+%patch -P14 -p1
+%patch -P15 -p1
+%patch -P16 -p1
+%patch -P17 -p1
+%patch -P18 -p1
+%patch -P19 -p1
 
 
 %build
